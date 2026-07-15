@@ -1,0 +1,44 @@
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data files (local, not tracked)
+data/*.parquet
+data/*.pkl
+logs/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build ledger (internal tracking)
+LEDGER.md
+PLAN.md
+teddy_prompt.txt
+
+# Hermes tmp
+.heroku-tmp*

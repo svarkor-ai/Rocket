@@ -1,0 +1,1 @@
+# Rocket Stock Scanner tests
