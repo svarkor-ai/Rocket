@@ -12,8 +12,7 @@ from rocket.data.storage import save_ohlcv, load_ohlcv, needs_update
 from rocket.data.models import TickerInfo, Region
 from rocket.scoring.rocket_score import compute_rocket_score
 from rocket.scoring.ranking import rank_regions, top_overall
-from rocket.scoring.filter import apply_filters
-from rocket.technical.signal_combiner import SignalCombiner
+from rocket.scoring.models import RocketScore
 from rocket.technical.momentum import RSI, MACD, Stochastic, WilliamsR, ROC, CCI
 from rocket.technical.trend import EMA9, EMA21, EMA50, EMA200, EMACrossover, ADX
 from rocket.technical.volatility import BollingerBands, ATR, DonchianChannel
@@ -45,41 +44,43 @@ def _build_indicator_results(df: pd.DataFrame) -> list:
     return results
 
 
-def _score_ticker(ticker: str, df: pd.DataFrame) -> dict:
-    """Score a single ticker, return dict with scores and details."""
+def _rocket_to_dict(rs: RocketScore) -> dict:
+    """Convert a RocketScore dataclass to a flat dict for Dash storage."""
+    return {
+        "ticker": rs.ticker,
+        "overall_score": rs.overall_score,
+        "momentum_score": rs.momentum_score,
+        "trend_score": rs.trend_score,
+        "volatility_score": rs.volatility_score,
+        "volume_score": rs.volume_score,
+        "buy_count": rs.buy_count,
+        "sell_count": rs.sell_count,
+        "hold_count": rs.hold_count,
+        "filter_passed": rs.filter_passed,
+        "filter_reason": rs.filter_reason,
+        "region": rs.region,
+        "sector": rs.sector,
+        "current_price": rs.current_price,
+        "avg_volume": rs.avg_volume,
+    }
+
+
+def _score_ticker(ticker: str, df: pd.DataFrame) -> tuple:
+    """Score a single ticker using compute_rocket_score.
+    
+    Returns (RocketScore, dict) — RocketScore for ranking, dict for Dash storage.
+    """
     ticker_info = TickerInfo(ticker=ticker)
-    close_prices = df['close']
-    current_price = float(close_prices.iloc[-1])
+    current_price = float(df['close'].iloc[-1])
     avg_vol = float(df['volume'].mean()) if len(df) > 0 else 0.0
     ticker_info.avg_volume = avg_vol
 
-    filter_result = apply_filters(ticker_info, current_price=current_price)
-    results = _build_indicator_results(df)
-    combiner = SignalCombiner()
-    signal_summary = combiner.combine(results)
-
-    # Import weighter with correct path
-    from rocket.scoring.weighter import weight_scores
-    rocket_score = weight_scores(signal_summary, filter_result, ticker=ticker)
-
-    return {
-        "ticker": ticker,
-        "overall_score": rocket_score.overall_score,
-        "momentum_score": rocket_score.momentum_score,
-        "trend_score": rocket_score.trend_score,
-        "volatility_score": rocket_score.volatility_score,
-        "volume_score": rocket_score.volume_score,
-        "buy_count": rocket_score.buy_count,
-        "sell_count": rocket_score.sell_count,
-        "hold_count": rocket_score.hold_count,
-        "filter_passed": rocket_score.filter_passed,
-        "filter_reasons": rocket_score.filter_result.reasons,
-        "region": rocket_score.region,
-        "sector": rocket_score.sector,
-        "current_price": current_price,
-        "avg_volume": avg_vol,
-        "details": rocket_score.filter_result.reasons,
-    }
+    result = compute_rocket_score(df, ticker_info, current_price=current_price)
+    rocket_score = result["rocket_score"]
+    rocket_score.current_price = current_price  # for display
+    rocket_score.avg_volume = avg_vol  # for display
+    
+    return rocket_score, _rocket_to_dict(rocket_score)
 
 
 def setup_callbacks(app):
@@ -127,13 +128,15 @@ def setup_callbacks(app):
         # Fetch OHLCV data
         ohlcv_data = fetch_ohlcv(tickers, period="2y", interval="1d")
 
-        # Score each ticker
-        all_scores = []
+        # Score each ticker (RocketScore for ranking, dict for Dash)
+        rocket_scores = []  # RocketScore dataclass objects for ranking
+        all_score_dicts = []  # dicts for Dash storage
         for i, ticker in enumerate(tickers, 1):
             if ticker in ohlcv_data:
                 df = ohlcv_data[ticker]
-                score = _score_ticker(ticker, df)
-                all_scores.append(score)
+                rocket_score, score_dict = _score_ticker(ticker, df)
+                rocket_scores.append(rocket_score)
+                all_score_dicts.append(score_dict)
 
                 # Save to parquet cache
                 try:
@@ -141,18 +144,22 @@ def setup_callbacks(app):
                 except Exception as e:
                     logger.debug(f"Save failed for {ticker}: {e}")
 
-        # Rank regions
-        region_scores = {region: all_scores}
+        # Rank regions using RocketScore objects
+        region_scores = {region: rocket_scores}
         ranked = rank_regions(region_scores, top_n=20)
         top_all = top_overall(region_scores, top_n=20)
+
+        # Convert ranked results to dicts for Dash storage
+        ranked_dicts = [_rocket_to_dict(rs) for rs in ranked.get(region, [])]
+        top_overall_dicts = [_rocket_to_dict(rs) for rs in top_all]
 
         # Build store data
         store_data = {
             "region": region,
-            "ranked": [s for s in ranked.get(region, [])],
-            "top_overall": [s for s in top_all],
+            "ranked": ranked_dicts,
+            "top_overall": top_overall_dicts,
             "tickers_fetched": len(ohlcv_data),
-            "tickers_scored": len(all_scores),
+            "tickers_scored": len(all_score_dicts),
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -160,7 +167,7 @@ def setup_callbacks(app):
 
         return (
             store_data,
-            f"✓ {len(all_scores)} tickers scored",
+            f"✓ {len(all_score_dicts)} tickers scored",
             f"Updated: {store_data['timestamp'][:19]}",
         )
 
@@ -180,8 +187,8 @@ def setup_callbacks(app):
 
         # Try to load data
         df = load_ohlcv("/tmp/rocket-ohlcv", ticker)
-        if df is None and ticker in fetch_ohlcv([ticker]):
-            df = fetch_ohlcv([ticker])[ticker]
+        if df is None and ticker in fetch_ohlcv([ticker], period="2y"):
+            df = fetch_ohlcv([ticker], period="2y")[ticker]
 
         if df is None or df.empty:
             return {}, f"Ticker: {ticker}\nNo data available"
@@ -238,9 +245,17 @@ def setup_callbacks(app):
         if df is None or df.empty or len(df) < 60:
             return {}, "Not enough data for backtest"
 
-        # Simple moving average crossover strategy
-        fast_period = int(strategy.split(":")[0]) if ":" in strategy else 9
-        slow_period = int(strategy.split(":")[1]) if ":" in strategy else 21
+        # Map dropdown strategy values to actual EMA crossover parameters
+        strategy_map = {
+            "buy_hold": ("buy_hold", 1, 1),    # special flag: no crossover
+            "ema": ("ema", 9, 21),
+            "rsi": ("rsi", 14, 21),            # placeholder EMA params for RSI backtest
+            "combo": ("combo", 9, 21),
+        }
+        params = strategy_map.get(strategy, ("ema", 9, 21))
+        strategy_type = params[0]
+        fast_period = params[1]
+        slow_period = params[2]
 
         ema_fast = df['close'].ewm(span=fast_period, adjust=False).mean()
         ema_slow = df['close'].ewm(span=slow_period, adjust=False).mean()
@@ -258,17 +273,43 @@ def setup_callbacks(app):
             close = row['close']
             date = row.name if hasattr(row.name, 'strftime') else str(row.name)
 
-            # Buy signal: fast crosses above slow
-            if position == 0 and ema_fast.iloc[i] > ema_slow.iloc[i] and ema_fast.iloc[i - 1] <= ema_slow.iloc[i - 1]:
-                qty = int(cash * 0.95 / close)
-                if qty > 0:
-                    cash -= qty * close * (1 + commission)
-                    position = qty
+            if strategy_type == "buy_hold":
+                # Buy immediately and hold
+                if i == 1 and position == 0:
+                    qty = int(cash * 0.99 / close)
+                    if qty > 0:
+                        cash -= qty * close * (1 + commission)
+                        position = qty
+            elif strategy_type == "rsi":
+                # RSI mean-reversion: buy RSI<30, sell RSI>70
+                delta = df['close'].diff()
+                gain = delta.clip(lower=0).rolling(14).mean()
+                loss = (-delta.clip(upper=0)).rolling(14).mean()
+                rs = gain / loss.replace(0, np.finfo(float).eps)
+                rsi = 100 - (100 / (1 + rs))
+                rsi_val = rsi.iloc[i] if i < len(rsi) else 50
 
-            # Sell signal: fast crosses below slow
-            elif position > 0 and ema_fast.iloc[i] < ema_slow.iloc[i] and ema_fast.iloc[i - 1] >= ema_slow.iloc[i - 1]:
-                cash += position * close * (1 - commission)
-                position = 0
+                if position == 0 and rsi_val < 30:
+                    qty = int(cash * 0.95 / close)
+                    if qty > 0:
+                        cash -= qty * close * (1 + commission)
+                        position = qty
+                elif position > 0 and rsi_val > 70:
+                    cash += position * close * (1 - commission)
+                    position = 0
+            else:
+                # Normal EMA crossover (ema, combo)
+                # Buy signal: fast crosses above slow
+                if position == 0 and ema_fast.iloc[i] > ema_slow.iloc[i] and ema_fast.iloc[i - 1] <= ema_slow.iloc[i - 1]:
+                    qty = int(cash * 0.95 / close)
+                    if qty > 0:
+                        cash -= qty * close * (1 + commission)
+                        position = qty
+
+                # Sell signal: fast crosses below slow
+                elif position > 0 and ema_fast.iloc[i] < ema_slow.iloc[i] and ema_fast.iloc[i - 1] >= ema_slow.iloc[i - 1]:
+                    cash += position * close * (1 - commission)
+                    position = 0
 
             equity = cash + position * close
             equity_curve.append(equity)

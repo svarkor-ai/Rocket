@@ -16,7 +16,9 @@ WEIGHTS = {
 
 
 def _to_0_100(score_11: float) -> float:
-    """Convert from [-1, 1] to [0, 100]."""
+    """Convert from [-1, 1] to [0, 100]. Returns NaN if score is NaN."""
+    if score_11 != score_11:  # NaN check: NaN != NaN is True
+        return float('nan')
     return float(max(0.0, min(100.0, (score_11 + 1.0) / 2.0 * 100.0)))
 
 

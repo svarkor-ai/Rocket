@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 # App config
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = str(BASE_DIR / "data" / "raw")
-DEFAULT_REGIONS = ["smid", "us"]
+DEFAULT_REGIONS = ["usa"]
 
 # All indicator instances (reuse from rocket.scoring.rocket_score)
 INDICATORS = [
@@ -95,9 +95,19 @@ def _indicator_values_to_dicts(results) -> List[Dict[str, Any]]:
     return out
 
 
+# Map our 4-region names → legacy Region enum values
+_REGION_MAP = {
+    "sweden": "smid",
+    "usa": "us",
+    "china": "asia",
+    "india": "asia",
+}
+
+
 def _score_from_summary(summary, ticker: str = "", region: str = "us", sector: str = "") -> Dict:
     """Compute full RocketScore from a SignalSummary (with dummy ticker info)."""
-    ticker_info = TickerInfo(ticker=ticker, region=Region(region.upper()))
+    legacy_region = _REGION_MAP.get(region.lower(), region.upper())
+    ticker_info = TickerInfo(ticker=ticker, region=Region(legacy_region))
     filter_result = apply_filters(ticker_info, 0.0)
     rocket_score = weight_scores(summary, filter_result, ticker, region, sector)
     return {
@@ -124,30 +134,57 @@ def _get_universe_for_regions(regions: List[str]) -> List[str]:
     from rocket.data.universe import get_universe
     tickers = []
     for r in regions:
-        tickers.extend(get_universe(r))
+        try:
+            tickers.extend(get_universe(r))
+        except ValueError:
+            pass
     return sorted(set(tickers))
+
+
+def _get_all_region_options():
+    """Return region dropdown options with labels."""
+    from rocket.data.universe import REGION_LABELS
+    return [{'label': REGION_LABELS.get(r, r), 'value': r}
+            for r in ["sweden", "usa", "china", "india"]]
+
+
+def _build_ticker_dropdown_options(regions: List[str] = None, limit: int = 2000):
+    """Build ticker dropdown options from specified regions."""
+    from rocket.data.universe import REGIONS
+    tickers = []
+    if regions:
+        for r in regions:
+            try:
+                tickers.extend(REGIONS.get(r, []))
+            except (AttributeError, TypeError):
+                pass
+    else:
+        for t in REGIONS.values():
+            tickers.extend(t)
+    return [{'label': t, 'value': t} for t in sorted(set(tickers))[:limit]]
 
 
 def _refresh_data(data_dir: str, regions: List[str] = None, days: int = 365):
     """Fetch OHLCV data for tickers in given regions."""
     if regions is None:
-        regions = ["smid", "us", "eu", "asia"]
+        regions = ["sweden", "usa", "china", "india"]
     counts = {"fetched": 0, "errors": 0, "skipped": 0}
-    for region in regions:
-        for ticker in _get_universe_for_regions([region]):
-            end = datetime.now()
-            start = end - timedelta(days=days)
-            try:
-                df = fetch_ohlcv(ticker, start_date=start.strftime("%Y-%m-%d"),
-                                 end_date=end.strftime("%Y-%m-%d"))
-                if df is not None and len(df) > 10:
-                    save_ohlcv(data_dir, ticker, df)
-                    counts["fetched"] += 1
-                else:
-                    counts["skipped"] += 1
-            except Exception as e:
-                logger.warning(f"Failed to fetch {ticker}: {e}")
-                counts["errors"] += 1
+    tickers = _get_universe_for_regions(regions)
+    logger.info(f"Refreshing data for {len(tickers)} tickers across {regions}")
+    for ticker in tickers:
+        end = datetime.now()
+        start = end - timedelta(days=days)
+        try:
+            df = fetch_ohlcv(ticker, start_date=start.strftime("%Y-%m-%d"),
+                             end_date=end.strftime("%Y-%m-%d"))
+            if df is not None and len(df) > 10:
+                save_ohlcv(data_dir, ticker, df)
+                counts["fetched"] += 1
+            else:
+                counts["skipped"] += 1
+        except Exception as e:
+            logger.warning(f"Failed to fetch {ticker}: {e}")
+            counts["errors"] += 1
     return counts
 
 
@@ -199,7 +236,7 @@ header = html.Div([
     html.H1("🚀 Rocket Stock Scanner",
             style={'textAlign': 'center', 'color': '#00e676',
                    'marginBottom': 0, 'marginTop': 10, 'fontSize': 32}),
-    html.P("Global SMID/EU/US/Asia Technical Analysis & Scoring",
+    html.P("Global Stock Scanner — Sweden · USA · China · India",
            style={'textAlign': 'center', 'color': '#9e9e9e', 'fontSize': 14}),
 ])
 
@@ -216,13 +253,11 @@ tabs = dbc.Tabs([
     persistence_type='local')
 
 # Rankings tab
-regions_list = list(_get_universe_for_regions(["smid", "us", "eu", "asia"]))
 rankings_tab = dbc.Container([
     html.Div([
         html.Label("Regions", style={'color': '#e0e0e0'}),
         dcc.Dropdown(
-            options=[{'label': r.upper(), 'value': r}
-                     for r in ["smid", "us", "eu", "asia"]],
+            options=_get_all_region_options(),
             value=DEFAULT_REGIONS, multi=True, id="rank-regions",
             style={'backgroundColor': '#0f3460', 'color': '#e0e0e0'}),
     ], style={'width': '30%', 'display': 'inline-block'}),
@@ -244,10 +279,11 @@ detail_tab = dbc.Container([
     html.Div([
         html.Label("Ticker", style={'color': '#e0e0e0'}),
         dcc.Dropdown(id="detail-ticker",
-                      options=[{'label': t, 'value': t} for t in regions_list[:500]],
+                      options=lambda: _build_ticker_dropdown_options(),
                       placeholder="Search ticker...",
+                      searchable=True,
                       style={'backgroundColor': '#0f3460', 'color': '#e0e0e0',
-                             'width': '30%', 'display': 'inline-block'}),
+                             'width': '40%', 'display': 'inline-block'}),
         html.Label("Period (days)", style={'color': '#e0e0e0', 'marginLeft': 20}),
         dcc.Dropdown(options=[{'label': str(p), 'value': p}
                                for p in [30, 60, 90, 180, 365]],
@@ -265,8 +301,9 @@ backtest_tab = dbc.Container([
     html.Div([
         html.Label("Ticker", style={'color': '#e0e0e0'}),
         dcc.Dropdown(id="back-ticker",
-                      options=[{'label': t, 'value': t} for t in regions_list[:500]],
+                      options=lambda: _build_ticker_dropdown_options(),
                       placeholder="Select ticker...",
+                      searchable=True,
                       style={'backgroundColor': '#0f3460', 'color': '#e0e0e0'}),
         html.Label("Strategy", style={'color': '#e0e0e0', 'marginLeft': 20}),
         dcc.Dropdown(options=[{'label': 'EMA Crossover 9/21', 'value': 'ema_crossover'},
@@ -288,8 +325,9 @@ sentiment_tab = dbc.Container([
     html.Div([
         html.Label("Ticker", style={'color': '#e0e0e0'}),
         dcc.Dropdown(id="sent-ticker",
-                      options=[{'label': t, 'value': t} for t in regions_list[:500]],
+                      options=lambda: _build_ticker_dropdown_options(),
                       placeholder="Select ticker...",
+                      searchable=True,
                       style={'backgroundColor': '#0f3460', 'color': '#e0e0e0'}),
         html.Button("Fetch Sentiment", id="sent-run", n_clicks=0,
                      style={'marginLeft': 20, 'backgroundColor': '#00e676',
@@ -313,11 +351,21 @@ settings_tab = dbc.Container([
                                'border': '1px solid #333', 'padding': '5px'}),
         ], style={'marginBottom': 20}),
         html.Div([
+            html.H4("Universe", style={'color': '#00e676'}),
+            html.P("1225+ tickers across 4 regions:", style={'color': '#e0e0e0', 'fontSize': 13}),
+            html.Ul([
+                html.Li("🇸🇪 Sweden: ~233 tickers (Nasdaq Stockholm)"),
+                html.Li("🇺🇸 USA: ~459 tickers (S&P 500 + growth)"),
+                html.Li("🇨🇳 China: ~233 tickers (A-shares + Hong Kong + ADS)"),
+                html.Li("🇮🇳 India: ~300 tickers (NIFTY 500+)"),
+            ], style={'color': '#9e9e9e', 'fontSize': 12, 'marginBottom': 20}),
+        ], style={'marginBottom': 20}),
+        html.Div([
             html.H4("Scoring Weights (used by SignalCombiner + weighter)"),
             html.P("Momentum 40% · Trend 30% · Volatility 20% · Volume 10%",
                    style={'color': '#9e9e9e', 'fontSize': 13}),
         ], style={'marginBottom': 20}),
-        html.Button("Run Data Update (all regions, 365 days)",
+        html.Button("Run Data Update (all regions, 365 days, ~1225 tickers)",
                      id="run-update", n_clicks=0,
                      style={'backgroundColor': '#2962ff', 'color': '#fff',
                             'border': 'none', 'padding': '10px 20px',
@@ -743,7 +791,7 @@ def run_data_update(n, data_dir):
         return ""
     try:
         counts = _refresh_data(data_dir,
-                                regions=["smid", "us", "eu", "asia"],
+                                regions=["sweden", "usa", "china", "india"],
                                 days=365)
         return html.Div([
             html.Span(

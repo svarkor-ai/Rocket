@@ -33,7 +33,7 @@ def _build_tab_rankings(region_scores):
         ], className="mb-3 border-0")
     options = [{"label": r.capitalize(), "value": r} for r in region_scores]
     rank_tables = {r: _build_table(s[:20]) for r, s in region_scores.items()}
-    default_val = options[0]["value"] if options else "US"
+    default_val = options[0]["value"] if options else "usa"
     return dbc.Card([
         dbc.CardHeader(
             html.H4(_tab_icon("rocket-takeoff"), "Top Rankings", className="mb-0"),
@@ -42,7 +42,7 @@ def _build_tab_rankings(region_scores):
             dcc.Dropdown(id="region-dropdown", options=options,
                          value=default_val, clearable=False, className="mb-3",
                          style={"backgroundColor": "#1a1a2e", "color": "#e0e0e0"}),
-            html.Div(id="ranking-table", children=[rank_tables.get("US")]),
+            html.Div(id="ranking-table", children=[rank_tables.get("usa")]),
         ]),
     ], className="mb-3 border-0")
 
@@ -56,7 +56,7 @@ def _build_tab_detail(region_scores):
                        className="text-muted text-center"),
             ]),
         ], className="mb-3 border-0")
-    tickers = region_scores.get("US", [])
+    tickers = region_scores.get("usa", [])
     return dbc.Card([
         dbc.CardHeader(
             html.H4(_tab_icon("search"), "Ticker Detail", className="mb-0"),

@@ -60,7 +60,7 @@ class MACD(BaseIndicator):
             score = normalize_score(min(hist_v / abs(macd_v + sig_v), 1.0) if (macd_v + sig_v) != 0 else 0.5)
             signal = Signal.BUY
         elif hist_v < 0:
-            score = normalize_score(max(hist_v / abs(macd_v + sig_v + 1), -1.0))
+            score = normalize_score(max(hist_v / abs(macd_v + sig_v), -1.0) if (macd_v + sig_v) != 0 else -0.5)
             signal = Signal.SELL
         else:
             score = 0.0
@@ -178,11 +178,11 @@ class CCI(BaseIndicator):
         cci_v = self._last(cci)
 
         if cci_v > 100:
-            signal = Signal.BUY
-            score = normalize_score(min(cci_v / 300, 1.0))
+            signal = Signal.SELL  # Overbought
+            score = normalize_score(max(-cci_v / 300, -1.0))  # Negative of positive CCI → negative score
         elif cci_v < -100:
-            signal = Signal.SELL
-            score = normalize_score(max(cci_v / 300, -1.0))
+            signal = Signal.BUY  # Oversold
+            score = normalize_score(-cci_v / 300)  # Negative of negative CCI → positive score
         else:
             signal = Signal.HOLD
             score = normalize_score(cci_v / 100)
