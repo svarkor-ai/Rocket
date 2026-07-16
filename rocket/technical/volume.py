@@ -22,10 +22,10 @@ class OBV(BaseIndicator):
         obv_trend_val = self._last(obv_trend)
 
         if obv_trend_val > 0:
-            score = normalize_score(min(obv_trend_val / abs(obv_val + 1), 0.7))
+            score = normalize_score(min(obv_trend_val / (abs(obv_val) + 1), 0.7))
             signal = Signal.BUY
         elif obv_trend_val < 0:
-            score = normalize_score(max(obv_trend_val / abs(obv_val + 1), -0.7))
+            score = normalize_score(max(obv_trend_val / (abs(obv_val) + 1), -0.7))
             signal = Signal.SELL
         else:
             score = 0.0

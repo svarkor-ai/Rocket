@@ -17,21 +17,7 @@ class IchimokuCloud(BaseIndicator):
     def calculate(self, df: pd.DataFrame) -> IndicatorResult:
         df = self._normalize_columns(df)
         mid = (df['high'] + df['low']) / 2
-        conversion_line = (
-            df['high'].rolling(self.conversion).max()
-            - df['low'].rolling(self.conversion).min()
-        ) / 2 + (
-            df['high'].rolling(self.conversion).min()
-        )
 
-        base_line = (
-            df['high'].rolling(self.base).max()
-            - df['low'].rolling(self.base).min()
-        ) / 2 + (
-            df['high'].rolling(self.base).min()
-        )
-
-        # Simplified: use mid-range approach
         cl = (
             df['high'].rolling(self.conversion).max()
             + df['low'].rolling(self.conversion).min()

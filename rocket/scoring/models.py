@@ -34,6 +34,8 @@ class RocketScore:
     trend_details: dict = field(default_factory=dict)
     volatility_details: dict = field(default_factory=dict)
     volume_details: dict = field(default_factory=dict)
+    current_price: float = 0.0
+    avg_volume: float = 0.0
 
 
 @dataclass
