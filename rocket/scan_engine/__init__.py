@@ -1,3 +1,6 @@
-"""Stock Scan Pro — real-time signal engine with Telegram push notifications."""
+"""Signal Engine — scan tickers, detect signal changes, persist state."""
+from .models import SignalEvent, SignalState
+from .storage import SignalStorage
+from .engine import SignalEngine
 
-__version__ = "0.1.0"
+__all__ = ["SignalEvent", "SignalState", "SignalStorage", "SignalEngine"]
