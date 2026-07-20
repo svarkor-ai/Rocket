@@ -6,6 +6,8 @@ import os
 
 from telegram.ext import ApplicationBuilder, CommandHandler
 
+from rocket.users.store import UserStore
+
 from .handlers import (
     start_command,
     subscribe_command,
@@ -15,11 +17,34 @@ from .handlers import (
     signal_command,
     help_command,
 )
+from .commands import (
+    plan_command,
+    user_status_command,
+    admin_list_command,
+    activate_command,
+    deactivate_command,
+)
 
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("SCAN_PRO_TELEGRAM_BOT_TOKEN", "")
 ADMIN_CHAT_ID = os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "")
+
+_user_store: UserStore | None = None
+
+
+def _get_user_store() -> UserStore:
+    global _user_store
+    if _user_store is None:
+        db_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "data",
+            "users.db",
+        )
+        _user_store = UserStore(db_path)
+    return _user_store
 
 
 def create_application() -> Application:
@@ -31,8 +56,21 @@ def create_application() -> Application:
     )
 
 
+def _make_admin_wrapper(fn, store, admin_chat_id):
+    """Wrap a function so only admin_chat_id can call it."""
+    async def wrapper(update, context):
+        if admin_chat_id is None or str(update.effective_user.id) != str(admin_chat_id):
+            await update.message.reply_text("Du har inte behörighet.")
+            return
+        return await fn(update, context, store)
+    return wrapper
+
+
 def register_handlers(application: Application) -> None:
     """Wire every /command to its handler coroutine."""
+    store = _get_user_store()
+    admin_chat_id = int(ADMIN_CHAT_ID) if ADMIN_CHAT_ID else None
+
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("subscribe", subscribe_command))
     application.add_handler(CommandHandler("unsubscribe", unsubscribe_command))
@@ -40,6 +78,11 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("signal", signal_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("plan", plan_command))
+    application.add_handler(CommandHandler("user-status", lambda u, c: user_status_command(u, c, store)))
+    application.add_handler(CommandHandler("admin", admin_list_command))
+    application.add_handler(CommandHandler("activate", _make_admin_wrapper(activate_command, store, admin_chat_id)))
+    application.add_handler(CommandHandler("deactivate", _make_admin_wrapper(deactivate_command, store, admin_chat_id)))
 
     # Register handlers that need bot/chat_id context
     from .handlers import register_callback_handlers
