@@ -23,8 +23,6 @@ from .commands import (
     plan_command,
     user_status_command,
     admin_list_command,
-    activate_command,
-    deactivate_command,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,7 +47,7 @@ def _get_user_store() -> UserStore:
     return _user_store
 
 
-def create_application() -> Application:
+def create_application() -> "Application":
     """Build and return the telegram-bot Application."""
     return (
         ApplicationBuilder()
@@ -68,7 +66,7 @@ def _make_admin_wrapper(fn, store, admin_chat_id):
     return wrapper
 
 
-def register_handlers(application: Application) -> None:
+def register_handlers(application: "Application") -> None:
     """Wire every /command to its handler coroutine."""
     store = _get_user_store()
     admin_chat_id = int(ADMIN_CHAT_ID) if ADMIN_CHAT_ID else None
@@ -83,8 +81,6 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("plan", plan_command))
     application.add_handler(CommandHandler("userstatus", lambda u, c: user_status_command(u, c, store)))
     application.add_handler(CommandHandler("adminlist", _make_admin_wrapper(admin_list_command, store, admin_chat_id)))
-    application.add_handler(CommandHandler("adminactivate", _make_admin_wrapper(activate_command, store, admin_chat_id)))
-    application.add_handler(CommandHandler("admindeactivate", _make_admin_wrapper(deactivate_command, store, admin_chat_id)))
     application.add_handler(CommandHandler("scanall", scanall_command))
     application.add_handler(CommandHandler("history", history_command))
 

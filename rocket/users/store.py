@@ -70,6 +70,7 @@ class UserStore:
         self.db.commit()
 
     def upgrade_to_premium(self, chat_id: int):
+        """Internal helper — no longer used for paid activation. Kept for admin tooling."""
         from datetime import datetime, timezone
         user = self.get_user(chat_id)
         if not user:
@@ -80,6 +81,7 @@ class UserStore:
         self.update_user(user)
 
     def deactivate_premium(self, chat_id: int):
+        """Internal helper — no longer used for paid deactivation. Kept for admin tooling."""
         user = self.get_user(chat_id)
         if not user:
             return
@@ -98,7 +100,7 @@ class UserStore:
             if current_count >= user.max_subscriptions:
                 raise ValueError(
                     f"Gratisnivå har max {user.max_subscriptions} ticker-subscriptioner. "
-                    f"Uppgradera till premium för obegränsade. Skicka /plan för mer info."
+                    f"Kontakta admin för fler."
                 )
 
         self.db.execute(
