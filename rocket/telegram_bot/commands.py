@@ -1,156 +1,140 @@
-"""Extra commands: plan, user-status, admin, activate, deactivate."""
+"""Telegram bot command handlers for user management (free/premium tiers)."""
 from __future__ import annotations
 
-import logging
-from datetime import datetime, timezone
+import os
 
-from telegram import Update
-from telegram.ext import ContextTypes
+from ..users.store import UserStore
 
-from rocket.users.tiers import TIER_DISPLAY
-
-logger = logging.getLogger(__name__)
+ADMIN_CHAT_ID: int = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
 
 
-# ---------------------------------------------------------------------------
-# /plan — show plans to any user
-# ---------------------------------------------------------------------------
-
-async def plan_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show subscription plans."""
-    plan_text = (
-        "💰 *Stock Scan Pro — Planer*\n\n"
-        f"*{TIER_DISPLAY['free']['emoji']} {TIER_DISPLAY['free']['name']}*\n"
-        f"  {TIER_DISPLAY['free']['desc']}\n"
-        f"  Pris: {TIER_DISPLAY['free']['price']}\n"
-        f"  Bli med nu — helt gratis!\n\n"
-        f"*{TIER_DISPLAY['premium']['emoji']} {TIER_DISPLAY['premium']['name']}*\n"
-        f"  {TIER_DISPLAY['premium']['desc']}\n"
-        f"  Pris: {TIER_DISPLAY['premium']['price']}/mån\n\n"
-        "_För att uppgradera:_\n"
-        "1. Skicka ETH till [din address]\n"
-        "2. Skicka /activate <chat_id> premium\n\n"
-        "🔜 Beta — gratis för alla nu!"
-    )
-    await update.message.reply_text(plan_text, parse_mode="Markdown")
-    logger.info(f"User {update.effective_user.id} (/plan)")
-
-
-# ---------------------------------------------------------------------------
-# /user-status — show current user's status
-# ---------------------------------------------------------------------------
-
-async def user_status_command(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, store
-) -> None:
-    """Show the user's current tier and subscription count."""
+async def _check_admin(update, context) -> bool:
+    """Return True if the sender is the admin; reply and return False otherwise."""
     chat_id = update.effective_user.id
-    user = store.get_user(chat_id) or store.create_user(chat_id)
+    if chat_id != ADMIN_CHAT_ID:
+        await update.message.reply_text("⛔ Endast admin kan använda detta kommando.")
+        return False
+    return True
 
-    tier = TIER_DISPLAY.get(user.tier.value, TIER_DISPLAY["free"])
-    count = store.count_subscriptions(chat_id)
-    max_subs = "∞" if user.max_subscriptions >= 100 else str(user.max_subscriptions)
 
-    status_text = (
-        f"👤 *Din Status*\n\n"
-        f"Tier: {tier['emoji']} {tier['name']}\n"
-        f"Subscriptioner: {count}/{max_subs}\n"
-        f"Medlem sedan: {user.subscribed_at or 'just nu'}"
+async def plan_command(update, context, store: UserStore):
+    """Show available plans."""
+    chat_id = context.user_data.get("chat_id", 0)
+    if not chat_id:
+        chat_id = update.effective_user.id
+    user = store.get_user(chat_id)
+    if not user:
+        user = store.create_user(chat_id)
+
+    sub_count = store.count_subscriptions(user.chat_id)
+
+    msg = (
+        "📊 *Stock Scan Pro — Planer*\n\n"
+        "🆓 *Gratis*\n"
+        "  • Max 3 ticker-subscriptioner\n"
+        "  • Alla 20+ tekniska indikatorer\n"
+        "  • Nyheter+sentiment-korrelation\n"
+        "  • Skannas vid behov (/scan)\n\n"
+        "💎 *Premium*\n"
+        "  • Obegränsade ticker-subscriptioner\n"
+        "  • Automatisk skanning (var 5:e minut)\n"
+        "  • Push-notiser i realtid\n"
+        "  • Extra signaler: RSI-korsningar, breakout-varningar\n"
+        "  • Historisk data + jämförelser\n\n"
+        f"Nuvarande status: {user.tier.value.upper()} "
+        f"({sub_count}/{'∞' if user.tier.value == 'premium' else str(user.max_subscriptions)} subscriptions)\n\n"
+        "För att aktivera premium: kontakta [REDACTED] via Swish.\n"
+        "Kontakta admin med /admin om du har betalat."
     )
-    await update.message.reply_text(status_text, parse_mode="Markdown")
-    logger.info(f"User {chat_id} (/user-status) tier={user.tier.value}")
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 
-# ---------------------------------------------------------------------------
-# /admin — list all users (admin only)
-# ---------------------------------------------------------------------------
+async def activate_command(update, context, store: UserStore):
+    """Activate premium for the current user (admin only)."""
+    if not await _check_admin(update, context):
+        return
 
-async def admin_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """List all registered users (admin)."""
-    from rocket.telegram_bot.handlers import _get_user_store
+    chat_id = update.effective_user.id
+    target_id = int(context.args[0]) if context.args else chat_id
+    user = store.get_user(target_id)
+    if not user:
+        user = store.create_user(target_id)
 
-    store = _get_user_store()
+    store.upgrade_to_premium(target_id)
+
+    msg = (
+        "💎 *Premium aktiverad!*\n\n"
+        "Tack för din betalning! Du har nu obegränsade ticker-subscriptioner och automatisk skanning.\n\n"
+        "Din nuvarande status: *PREMIUM*\n\n"
+        "Skicka /subscribe <ticker> för att lägga till en ticker."
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def deactivate_command(update, context, store: UserStore):
+    """Deactivate premium (admin only)."""
+    if not await _check_admin(update, context):
+        return
+
+    chat_id = int(context.args[0]) if context.args else update.effective_user.id
+    user = store.get_user(chat_id)
+    if not user:
+        await update.message.reply_text("Användaren finns inte.")
+        return
+
+    store.deactivate_premium(chat_id)
+    await update.message.reply_text(f"Premium avaktiverat för chat_id={chat_id}")
+
+
+async def admin_list_command(update, context, store: UserStore):
+    """List all users (admin only)."""
+    if not await _check_admin(update, context):
+        return
 
     rows = store.db.execute(
-        "SELECT chat_id, username, tier, max_subscriptions, subscribed_at, "
-        "activated_at FROM users ORDER BY chat_id"
+        "SELECT chat_id, username, tier, max_subscriptions, subscribed_at FROM users"
     ).fetchall()
+    if not rows:
+        await update.message.reply_text("Inga användare ännu.")
+        return
 
-    lines = ["👥 *Användare (admin):*\n"]
+    lines = ["👥 Användare:"]
     for row in rows:
-        cid, uname, tier, max_sub, sub_at, act_at = row
-        tier_name = TIER_DISPLAY.get(tier, {}).get("name", tier)
-        sub_count = store.count_subscriptions(cid)
-        user_tag = f"@{uname}" if uname else "?"
+        sub_count = store.count_subscriptions(row["chat_id"])
+        tier_icon = "💎" if row["tier"] == "premium" else "🆓"
+        username_display = "@" + row["username"] if row["username"] else "?"
         lines.append(
-            f"  {cid} {user_tag} | {tier_name} | {sub_count}/{max_sub} | sedan: {sub_at or '?'}"
+            f"  {tier_icon} chat_id={row['chat_id']} {username_display} "
+            f"({row['tier']}, {sub_count} subs)"
         )
-
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
-    logger.info(f"Admin {update.effective_user.id} listed {len(rows)} users")
+    await update.message.reply_text("\n".join(lines))
 
 
-# ---------------------------------------------------------------------------
-# /activate — activate premium (admin only)
-# ---------------------------------------------------------------------------
-
-async def activate_command(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, store
-) -> None:
-    """Activate premium for a user."""
+async def user_status_command(update, context, store: UserStore):
+    """Show current user's status."""
     chat_id = update.effective_user.id
-    args = context.args
-    if not args or len(args) < 2:
-        await update.message.reply_text(
-            "Usage: /activate <chat_id> premium\n"
-            "Exempel: /activate 123456789 premium"
-        )
-        return
+    user = store.get_user(chat_id)
+    if not user:
+        user = store.create_user(chat_id)
 
-    target_id = int(args[0])
-    tier = args[1].lower()
+    subs = store.list_subscriptions(chat_id)
+    limit_icon = "∞" if user.tier.value == "premium" else str(user.max_subscriptions)
+    sub_count = len(subs)
 
-    if tier not in ("premium", "free"):
-        await update.message.reply_text(
-            "Ogiltig tier. Använd 'premium' eller 'free'."
-        )
-        return
-
-    if tier == "premium":
-        store.upgrade_to_premium(target_id)
-        await update.message.reply_text(
-            f"✅ Användare {target_id} uppgraderad till "
-            f"{TIER_DISPLAY['premium']['emoji']} "
-            f"{TIER_DISPLAY['premium']['name']}!"
-        )
-    else:
-        store.deactivate_premium(target_id)
-        await update.message.reply_text(
-            f"⬇️ Användare {target_id} nedgraderad till "
-            f"{TIER_DISPLAY['free']['emoji']} "
-            f"{TIER_DISPLAY['free']['name']}."
-        )
-
-    logger.info(f"Admin {chat_id} activated/deactivated {target_id} → {tier}")
-
-
-# ---------------------------------------------------------------------------
-# /deactivate — alias for /activate with free
-# ---------------------------------------------------------------------------
-
-async def deactivate_command(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, store
-) -> None:
-    """Deactivate premium — same as /activate <chat_id> free."""
-    chat_id = update.effective_user.id
-    args = context.args
-    if not args:
-        await update.message.reply_text("Usage: /deactivate <chat_id>")
-        return
-
-    target_id = int(args[0])
-    store.deactivate_premium(target_id)
-    await update.message.reply_text(
-        f"⬇️ Användare {target_id} nedgraderad till gratisnivå."
+    msg = (
+        "📊 *Din status*\n\n"
+        f"👤 Användare: @{update.effective_user.username or 'okänd'}\n"
+        f"🆓 Nivå: *{user.tier.value.upper()}*\n"
+        f"📋 Subscriptions: {sub_count}/{limit_icon}\n"
+        f"   {', '.join(subs) if subs else 'Inga'}\n\n"
+        "📋 Kommandon:\n"
+        "  /start — Starta botten\n"
+        "  /subscribe <ticker> — Lägg till en ticker\n"
+        "  /unsubscribe <ticker> — Ta bort en ticker\n"
+        "  /list — Visa dina subscriptions\n"
+        "  /status — Visa din status\n"
+        "  /plan — Visa planer och priser\n"
+        "  /scan <ticker> — Skanna en specifik ticker\n"
+        "  /help — Visa hjälptext"
     )
-    logger.info(f"Admin {chat_id} deactivated {target_id}")
+    await update.message.reply_text(msg, parse_mode="Markdown")
