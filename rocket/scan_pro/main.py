@@ -30,7 +30,7 @@ async def main() -> None:
     await application.start()
 
     logger.info("Bot is polling Telegram...")
-    await application.run_polling()
+    await application.run_polling(close_loop=False)
 
 
 if __name__ == "__main__":
