@@ -86,7 +86,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "📋 *Portfolio*\n"
         "• /list — show all subscriptions\n\n"
         "👤 *Account*\n"
-        "• /plan — view plans and prices\n"
+        "• /plan — view available plans\n"
         "• /userstatus — view your status\n\n"
         "ℹ️ *Help*\n"
         "• /help — this message\n"

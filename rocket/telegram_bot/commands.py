@@ -18,7 +18,7 @@ async def _check_admin(update, context) -> bool:
 
 
 async def plan_command(update, context, store: UserStore):
-    """Show available plans."""
+    """Show available plans — all features free."""
     chat_id = context.user_data.get("chat_id", 0)
     if not chat_id:
         chat_id = update.effective_user.id
@@ -29,61 +29,16 @@ async def plan_command(update, context, store: UserStore):
     sub_count = store.count_subscriptions(user.chat_id)
 
     msg = (
-        "📊 *Stock Scan Pro — Planer*\n\n"
-        "🆓 *Gratis*\n"
+        "📊 *Stock Scan Pro*\n\n"
+        "🆓 *Gratis* (alla funktioner)\n"
         "  • Max 3 ticker-subscriptioner\n"
         "  • Alla 20+ tekniska indikatorer\n"
         "  • Nyheter+sentiment-korrelation\n"
         "  • Skannas vid behov (/scan)\n\n"
-        "💎 *Premium*\n"
-        "  • Obegränsade ticker-subscriptioner\n"
-        "  • Automatisk skanning (var 5:e minut)\n"
-        "  • Push-notiser i realtid\n"
-        "  • Extra signaler: RSI-korsningar, breakout-varningar\n"
-        "  • Historisk data + jämförelser\n\n"
-        f"Nuvarande status: {user.tier.value.upper()} "
-        f"({sub_count}/{'∞' if user.tier.value == 'premium' else str(user.max_subscriptions)} subscriptions)\n\n"
-        "För att aktivera premium: kontakta [REDACTED] via Swish.\n"
-        "Kontakta admin med /admin om du har betalat."
+        f"Status: {user.tier.value.upper()} "
+        f"({sub_count}/{user.max_subscriptions} subscriptions)\n"
     )
     await update.message.reply_text(msg, parse_mode="Markdown")
-
-
-async def activate_command(update, context, store: UserStore):
-    """Activate premium for the current user (admin only)."""
-    if not await _check_admin(update, context):
-        return
-
-    chat_id = update.effective_user.id
-    target_id = int(context.args[0]) if context.args else chat_id
-    user = store.get_user(target_id)
-    if not user:
-        user = store.create_user(target_id)
-
-    store.upgrade_to_premium(target_id)
-
-    msg = (
-        "💎 *Premium aktiverad!*\n\n"
-        "Tack för din betalning! Du har nu obegränsade ticker-subscriptioner och automatisk skanning.\n\n"
-        "Din nuvarande status: *PREMIUM*\n\n"
-        "Skicka /subscribe <ticker> för att lägga till en ticker."
-    )
-    await update.message.reply_text(msg, parse_mode="Markdown")
-
-
-async def deactivate_command(update, context, store: UserStore):
-    """Deactivate premium (admin only)."""
-    if not await _check_admin(update, context):
-        return
-
-    chat_id = int(context.args[0]) if context.args else update.effective_user.id
-    user = store.get_user(chat_id)
-    if not user:
-        await update.message.reply_text("Användaren finns inte.")
-        return
-
-    store.deactivate_premium(chat_id)
-    await update.message.reply_text(f"Premium avaktiverat för chat_id={chat_id}")
 
 
 async def admin_list_command(update, context, store: UserStore):
@@ -133,7 +88,7 @@ async def user_status_command(update, context, store: UserStore):
         "  /unsubscribe <ticker> — Ta bort en ticker\n"
         "  /list — Visa dina subscriptions\n"
         "  /status — Visa din status\n"
-        "  /plan — Visa planer och priser\n"
+        "  /plan — Visa planer\n"
         "  /scan <ticker> — Skanna en specifik ticker\n"
         "  /help — Visa hjälptext"
     )
