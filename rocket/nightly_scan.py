@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "signals.db")
 
-BUY_THRESHOLD = 10
-SELL_THRESHOLD = 10
+BUY_THRESHOLD = 8
+SELL_THRESHOLD = 8
 
 
 def _derive_signal(summary: SignalSummary):
@@ -75,9 +75,9 @@ def _scan_one_ticker(ticker: str, region_key: str, storage: SignalStorage):
     new_signal, category = _derive_signal(summary)
     score = float(summary.overall_score)
 
-    # Normalize score to [0, 1]
-    normalized_score = (score + 1.0) / 2.0
-    if normalized_score < 0.5:
+    # Normalize score to [0, 1] (overall_score is already in [0,1] from compute_rocket_score)
+    normalized_score = (score + 1.0) / 2.0  # maps [0,1] → [0.5, 1.0]
+    if normalized_score < 0.55:  # equivalent to overall_score < 0.1
         return None
 
     # Save to signal_states
@@ -103,7 +103,7 @@ def _bulk_insert_history(storage, records):
     storage._conn.commit()
 
 
-def run(regions: list, test: bool = False):
+def run(regions: list, test: bool = False, test_limit: int = 5):
     """Run scan on given regions. Returns summary dict."""
     storage = SignalStorage(DB_PATH)
     all_states: list[tuple] = []
@@ -112,7 +112,7 @@ def run(regions: list, test: bool = False):
     for region in regions:
         tickers = get_universe(region)
         if test:
-            tickers = tickers[:5]
+            tickers = tickers[:test_limit]
 
         logger.info(f"Scanning region={region} ({len(tickers)} tickers)")
 
@@ -165,6 +165,7 @@ def run(regions: list, test: bool = False):
 def main():
     parser = argparse.ArgumentParser(description="Nightly stock scanner")
     parser.add_argument("--test", action="store_true", help="Quick test (1 region, 5 tickers)")
+    parser.add_argument("--test-limit", type=int, default=5, help="Number of tickers to scan in test mode")
     args = parser.parse_args()
 
     if args.test:
@@ -172,7 +173,8 @@ def main():
     else:
         regions = ["usa", "sweden", "china", "india", "international"]
 
-    summary = run(regions, test=args.test)
+    test_limit = getattr(args, 'test_limit', 5)
+    summary = run(regions, test=args.test, test_limit=test_limit)
 
     print(f"Scanned {summary['regions']} regions, {summary['tickers']} total tickers, {summary['signals']} signals emitted")
 
