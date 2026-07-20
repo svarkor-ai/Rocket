@@ -18,13 +18,20 @@ class User:
     activated_at: Optional[str] = None   # ISO timestamp when upgraded to premium
     max_subscriptions: int = 3  # free users get 3, premium gets 999
 
+    def __post_init__(self):
+        if self.tier == UserTier.FREE and self.max_subscriptions == 3:
+            self.max_subscriptions = 3
+        elif self.tier == UserTier.PREMIUM and self.max_subscriptions == 3:
+            self.max_subscriptions = 999
+
     @classmethod
     def from_dict(cls, d: dict) -> "User":
         d["tier"] = UserTier(d["tier"])
         d["subscribed_at"] = d.get("subscribed_at")
         d["activated_at"] = d.get("activated_at")
         d["username"] = d.get("username")
-        d["max_subscriptions"] = d.get("max_subscriptions", 3 if d.get("tier", "free") == "free" else 999)
+        if d.get("max_subscriptions") is None:
+            d["max_subscriptions"] = 3 if d["tier"] == UserTier.FREE else 999
         return cls(**d)
 
     def to_dict(self) -> dict:
