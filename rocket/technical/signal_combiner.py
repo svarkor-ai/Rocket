@@ -1,7 +1,6 @@
 """Combine individual indicator signals into a summary."""
 import numpy as np
 from dataclasses import dataclass, field
-from typing import List
 from .models import IndicatorResult, Signal, SignalCategory
 
 
@@ -29,7 +28,7 @@ class SignalCombiner:
         SignalCategory.VOLUME: 0.10,
     }
 
-    def combine(self, results: List[IndicatorResult]) -> SignalSummary:
+    def combine(self, results: list[IndicatorResult]) -> SignalSummary:
         """Combine a list of IndicatorResults into a SignalSummary."""
         categories = {
             SignalCategory.MOMENTUM: [],

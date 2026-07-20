@@ -177,6 +177,8 @@ class SignalEngine:
                 ev = self.scan_ticker(t, timeframe=timeframe)
                 if ev is not None:
                     events.append(ev)
+            except (KeyError, IndexError, ValueError) as e:
+                logger.error(f"{t}: scan error (invalid data): {e}")
             except Exception as e:
-                logger.error(f"{t}: scan error: {e}")
+                logger.error(f"{t}: scan error (unexpected): {type(e).__name__}: {e}")
         return events
