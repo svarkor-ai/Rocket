@@ -92,7 +92,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
          "/status <ticker> — check signal\\n"
          "/list — show all subscriptions\\n"
          "/plan — visa planer och priser\\n"
-         "/user-status — visa din status\\n"
+         "/userstatus — visa din status\\n"
          "/help — this message\\n"
      )
     await update.message.reply_text(help_text, parse_mode="Markdown")
