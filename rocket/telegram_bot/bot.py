@@ -79,10 +79,10 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("signal", signal_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("plan", plan_command))
-    application.add_handler(CommandHandler("user-status", lambda u, c: user_status_command(u, c, store)))
-    application.add_handler(CommandHandler("admin", admin_list_command))
-    application.add_handler(CommandHandler("activate", _make_admin_wrapper(activate_command, store, admin_chat_id)))
-    application.add_handler(CommandHandler("deactivate", _make_admin_wrapper(deactivate_command, store, admin_chat_id)))
+    application.add_handler(CommandHandler("userstatus", lambda u, c: user_status_command(u, c, store)))
+    application.add_handler(CommandHandler("adminlist", _make_admin_wrapper(admin_list_command, store, admin_chat_id)))
+    application.add_handler(CommandHandler("adminactivate", _make_admin_wrapper(activate_command, store, admin_chat_id)))
+    application.add_handler(CommandHandler("admindeactivate", _make_admin_wrapper(deactivate_command, store, admin_chat_id)))
 
     # Register handlers that need bot/chat_id context
     from .handlers import register_callback_handlers
