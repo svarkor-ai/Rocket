@@ -272,7 +272,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin-only: scan all tickers across all regions."""
-    chat_id = update.effective_chat.id
+    chat_id = update.effective_user.id
     admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
     if chat_id != admin_chat_id:
         await update.message.reply_text("🔒 Admin only")
