@@ -16,6 +16,7 @@ from .handlers import (
     status_command,
     signal_command,
     help_command,
+    scanall_command,
 )
 from .commands import (
     plan_command,
@@ -83,5 +84,6 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("adminlist", _make_admin_wrapper(admin_list_command, store, admin_chat_id)))
     application.add_handler(CommandHandler("adminactivate", _make_admin_wrapper(activate_command, store, admin_chat_id)))
     application.add_handler(CommandHandler("admindeactivate", _make_admin_wrapper(deactivate_command, store, admin_chat_id)))
+    application.add_handler(CommandHandler("scanall", scanall_command))
 
     logger.info("Telegram bot handlers registered")
