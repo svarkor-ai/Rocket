@@ -84,7 +84,4 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("adminactivate", _make_admin_wrapper(activate_command, store, admin_chat_id)))
     application.add_handler(CommandHandler("admindeactivate", _make_admin_wrapper(deactivate_command, store, admin_chat_id)))
 
-    # Register handlers that need bot/chat_id context
-    from .handlers import register_callback_handlers
-    register_callback_handlers(application)
     logger.info("Telegram bot handlers registered")
