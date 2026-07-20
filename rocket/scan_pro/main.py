@@ -1,17 +1,14 @@
 """Stock Scan Pro — main entry point."""
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
-import signal as stdlib_signal
 from dotenv import load_dotenv
 
 # Load .env BEFORE importing modules that read env vars
 _env_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "scan_pro.env")
 load_dotenv(_env_path)
 
-from telegram.ext import Application
 from rocket.telegram_bot.bot import create_application, register_handlers
 
 logging.basicConfig(
@@ -22,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
-    import sys
-
     application = create_application()
     register_handlers(application)
 
