@@ -1,14 +1,17 @@
 """Dynamic universe builder for Rocket Stock Scanner.
 
-Primary data sources (embedded reference lists, always available):
-    - USA: S&P 500 constituents (scraped from Wikipedia) + well-known large-cap
-    - Sweden: OMX Stockholm 30 + well-known Swedish stocks
-    - India: NIFTY 50 constituents + well-known Indian stocks
-    - China: major Shanghai/Shenzhen exchange tickers
-
-Secondary data sources (yfinance / Wikipedia, used to enrich):
-    - Scrapes Nasdaq 100, Russell 2000 constituents from Wikipedia
-    - Scrapes Sweden OMXS100, India SENSEX, China SSE constituents
+Primary data sources (embedded reference lists):
+    - USA: S&P 500 + well-known additional
+    - Sweden: OMX Stockholm 30 + additional
+    - India: NIFTY 50 + additional
+    - China: major SSE/SZ/HK tickers
+    - UK: FTSE 100 scraped tickers
+    - Germany: DAX scraped tickers
+    - France: CAC 40 scraped tickers
+    - Japan: Nikkei scraped tickers
+    - Australia: ASX 200 scraped tickers
+    - Canada: TSX scraped tickers
+    - And more via Wikipedia enrichment
 
 Cache: Results cached to rocket/data/universe_cache.json with 12h TTL.
 """
@@ -93,31 +96,22 @@ USA_SP500_TICKERS = [
 
 # Additional well-known large-cap / mega-cap US tickers not in S&P 500
 USA_ADDITIONAL_TICKERS = [
-    # Mega-caps and notable companies
     'AMZN', 'GOOGL', 'GOOG', 'META', 'TSLA', 'NVDA', 'AVGO', 'MSFT', 'AAPL',
     'BRK-B', 'JPM', 'V', 'UNH', 'XOM', 'LLY', 'MA', 'PG', 'HD',
-    # Tech / semiconductor
     'AMD', 'QCOM', 'INTC', 'AVGO', 'TXN', 'MU', 'AMAT', 'LRCX', 'KLAC', 'MRVL',
     'SNPS', 'CDNS', 'ANSS', 'MCHP', 'NXPI', 'ON', 'SWKS', 'MPWR',
-    # Software / internet
     'MSFT', 'ORCL', 'CRM', 'ADBE', 'NOW', 'INTU', 'UBER', 'SNAP', 'PINS',
     'SQ', 'SHOP', 'RBLX', 'PLTR', 'COIN', 'RIVN', 'LCID', 'NIO', 'LI', 'XPEV',
-    # Biotech / pharma
     'JNJ', 'PFE', 'MRK', 'ABBV', 'BMY', 'LLY', 'GILD', 'AMGN', 'REGN', 'VRTX',
     'BIIB', 'MRNA', 'SGEN', 'ZTS', 'IDXX', 'IQV', 'DXCM', 'ISRG',
-    # Financials
     'JPM', 'GS', 'MS', 'BAC', 'WFC', 'C', 'BLK', 'SCHW', 'AXP', 'V', 'MA',
     'USB', 'PNC', 'TFC', 'COF', 'AFL', 'MET', 'PRU', 'AIG', 'ALL', 'TRV',
     'CB', 'PGR', 'ICE', 'CME', 'SPGI', 'MCO', 'MSCI', 'NDAQ',
-    # Energy / Industrials
     'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'VLO', 'PSX', 'HAL', 'OXY',
     'HON', 'GE', 'CAT', 'DE', 'MMM', 'RTX', 'LMT', 'NOC', 'GD', 'BA',
-    # Consumer / Retail
     'AMZN', 'WMT', 'TGT', 'COST', 'HD', 'LOW', 'NKE', 'SBUX', 'MCD', 'DIS',
     'CMCSA', 'NFLX', 'PYPL', 'BKNG', 'MAR', 'HLT',
-    # Healthcare
     'UNH', 'CVS', 'CI', 'HUM', 'ELV', 'ANTM', 'CNC', 'MOH',
-    # Other notable
     'ADP', 'PAYX', 'FISV', 'FIS', 'VRSK', 'EXPD', 'JBHT', 'LSTR',
     'AMT', 'PLD', 'CCI', 'EQIX', 'PSA', 'WELL', 'DLR', 'SPG', 'O',
     'NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC', 'SRE', 'PEG', 'ED', 'WEC',
@@ -141,7 +135,7 @@ SWEDEN_TICKERS = [
     'SAND.ST', 'SHP-B.ST', 'SEB-A.ST', 'SEB-B.ST', 'SHP-A.ST',
     'SKF-B.ST', 'SSAB-A.ST', 'SSAB-B.ST', 'SWS-A.ST', 'SWS-B.ST',
     'SWE-B.ST', 'SWED-A.ST', 'SWED-B.ST', 'SYV-B.ST', 'TEL4O-B.ST',
-    'TELIA-B.ST', 'TDC-B.ST', 'TGC-B.ST', 'TIER.DE', 'TITB-B.ST',
+    'TELIA-B.ST', 'TDC-B.ST', 'TGC-B.ST', 'TITB-B.ST',
     'TOBB-B.ST', 'TOB-B.ST', 'TRUM-B.ST', 'UNIF-B.ST', 'UMEX-B.ST',
     'VIV-B.ST', 'VOL-B.ST', 'VOL-A.ST', 'WSO-B.ST', 'WSO-A.ST',
     'XYZ-A.ST', 'ZED-A.ST',
@@ -152,7 +146,6 @@ SWEDEN_TICKERS = [
 
 # India: NIFTY 50 constituents + well-known Indian stocks
 INDIA_TICKERS = [
-    # NIFTY 50 constituents (from Wikipedia)
     'ACC', 'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT',
     'AXISBANK', 'BAJAJ-AUTO', 'BAJAJFINSV', 'BAJFINANCE', 'BHEL',
     'BPCL', 'BHARTIARTL', 'CDSL', 'CIPLA', 'COALINDIA', 'DRREDDY',
@@ -164,7 +157,6 @@ INDIA_TICKERS = [
     'TATACONSUM', 'TATAMOTORS', 'TATASTEEL', 'TATATECH', 'TECHM',
     'TITAN', 'TORNTPHARM', 'TRENT', 'ULTRACEMCO', 'UPL', 'VBL',
     'VEDL', 'WIPRO', 'YESBANK', 'ZEEL',
-    # Additional well-known Indian stocks
     'ADANIGREEN', 'ADANISUMI', 'AXISBANK', 'BANKBARODA', 'CANBK',
     'CONCOR', 'DABUR', 'DLF', 'GMRINFRA', 'IBULHSGFIN', 'IOC',
     'IRCTC', 'IRFC', 'MUTHOOTFIN', 'NMDC', 'SJVN', 'SBI',
@@ -173,7 +165,6 @@ INDIA_TICKERS = [
 
 # China: Major Shanghai & Shenzhen exchange tickers
 CHINA_TICKERS = [
-    # Notable Shanghai (SH) / Shenzhen (SZ) stocks
     '600519.SS',  # Kweichow Moutai
     '601318.SS',  # Ping An Insurance
     '600036.SS',  # China Merchants Bank
@@ -199,7 +190,6 @@ CHINA_TICKERS = [
     '601012.SS',  # Longji New Energy
     '600809.SS',  # Shanxi Xingtai
     '600886.SS',  # SPIC
-    # Shenzhen stocks
     '000858.SZ',  # Wuliangye Yibin
     '000001.SZ',  # Ping An Bank
     '000002.SZ',  # Vanke
@@ -215,7 +205,6 @@ CHINA_TICKERS = [
     '300750.SZ',  # CATL
     '688981.SS',  # SMIC
     '688036.SS',  # Conson Electronics
-    # Hong Kong stocks (also tradable in China)
     '0700.HK',   # Tencent
     '9988.HK',   # Alibaba
     '1211.HK',   # BYD Company
@@ -228,6 +217,147 @@ CHINA_TICKERS = [
     '9999.HK',   # NetEase
 ]
 
+# ---------------------------------------------------------------------------
+# Additional scraped tickers (from Wikipedia index constituents)
+# ---------------------------------------------------------------------------
+
+# International tickers scraped from FTSE 100, DAX, CAC 40, ASX 200, TSX etc.
+# These have exchange suffixes (e.g., ADS.DE, ABN.AS)
+INTERNATIONAL_TICKERS = [
+    # DAX 40 (Germany)
+    'ADS.DE', 'ALV.DE', 'BAS.DE', 'BAYN.DE', 'BEI.DE', 'BEI.UN',
+    'BMW.DE', 'BNR.DE', 'CBK.DE', 'CON.DE', 'DHL.DE', 'DTE.DE',
+    'ENR.DE', 'EOAN.DE', 'FME.DE', 'FRE.DE', 'G1A.DE', 'G24.DE',
+    'HEI.DE', 'HEN3.DE', 'IFX.DE', 'MRK.DE', 'MBG.DE', 'MTX.DE',
+    'MUV2.DE', 'PAH3.DE', 'QIA.DE', 'RHM.DE', 'RWE.DE', 'SAP.DE',
+    'SHL.DE', 'SIE.DE', 'SY1.DE', 'VNA.DE', 'VOW3.DE', 'ZAL.DE',
+    
+    # FTSE 100 / 250 (UK)
+    'ABF', 'AZN', 'BARC', 'BATS', 'BHP', 'BP', 'BT.A', 'CCH',
+    'DGE', 'GLEN', 'HSBA', 'HSBC', 'IAG', 'LSEG', 'LVMH', 'RELX',
+    'RIO', 'RR', 'SHEL', 'ULVR', 'VOD', 'UU',
+    
+    # CAC 40 (France)
+    'AI.PA', 'AIR.PA', 'BN.PA', 'BNP.PA', 'CA.PA', 'DCS.PA',
+    'DG.PA', 'EL.PA', 'EN.PA', 'GLE.PA', 'HO.PA', 'KER.PA',
+    'MC.PA', 'ML.PA', 'OR.PA', 'ORA.PA', 'RMS.PA', 'RI.PA',
+    'RMS.PA', 'RNO.PA', 'SAN.PA', 'SGO.PA', 'SU.PA', 'TTE.PA',
+    'VIE.PA', 'VNA.DE', 'SAF.PA', 'DCO.PA',
+    
+    # ASX 200 (Australia) - tickers without suffix
+    'ABR', 'A2A', 'ABX', 'ANZ', 'API', 'ASH', 'AUTO', 'BAP',
+    'BEN', 'BHP', 'BOQ', 'BRG', 'CBA', 'CCC', 'CEN', 'CIS',
+    'CNC', 'COL', 'CPX', 'CSL', 'CTD', 'DOW', 'DRL', 'EGV',
+    'FLT', 'FMG', 'FPH', 'GAB', 'GNA', 'GPT', 'HDN', 'IAG',
+    'ILU', 'INC', 'JHX', 'LHP', 'MIN', 'MND', 'MQG', 'NAB',
+    'NEC', 'NXT', 'OGC', 'ORG', 'PGH', 'PLS', 'PME', 'QBE',
+    'REA', 'RHC', 'RMS', 'SGP', 'S32', 'SUN', 'TCL', 'TLS',
+    'TNE', 'TPG', 'WBC', 'WES', 'WOW', 'WPL', 'XRO',
+    
+    # TSX (Canada) - tickers without suffix
+    'ABX', 'BAM', 'BCE', 'BMO', 'CNQ', 'CP', 'CNR', 'CPR',
+    'DOL', 'ENB', 'FM', 'FNV', 'KMP', 'MFC', 'MFC', 'MGR',
+    'NG', 'NTR', 'RY', 'TOU', 'TRI', 'TRP', 'WPM', 'WCN',
+    
+    # Other international (from Wikipedia scraping)
+    'A2A.MI', 'AMP.MI', 'AZM.MI', 'BAMI.MI', 'BC.MI', 'BMED.MI',
+    'BPE.MI', 'CPR.MI', 'DIA.MI', 'ENEL.MI', 'HER.MI', 'IG.MI',
+    'INW.MI', 'ISP.MI', 'LTMC.MI', 'MONC.MI', 'NEXI.MI',
+    'PRY.MI', 'PST.MI', 'REC.MI', 'TEN.MI', 'TIT.MI', 'TRN.MI',
+    'UCG.MI', 'UNI.MI', 'BBVA.MC', 'ELE.MC', 'FDR.MC', 'FER.MC',
+    'IAG.MC', 'IBE.MC', 'IDR.MC', 'ITX.MC', 'MAP.MC', 'MTS.MC',
+    'NTGY.MC', 'PUIG.MC', 'RED.MC', 'REP.MC', 'SAB.MC', 'SLR.MC',
+    'TEF.MC', 'ABN.AS', 'AD.AS', 'AGN.AS', 'AKZA.AS', 'AMS.AS',
+    'ASML.AS', 'BESI.AS', 'DSFIR.AS', 'HEIA.AS', 'IMCD.AS',
+    'INGA.AS', 'KPN.AS', 'MT.AS', 'PHIA.AS', 'PRX.AS', 'RAND.AS',
+    'REN.AS', 'SHELL.AS', 'UMG.AS', 'UNA.AS', 'WKL.AS',
+]
+
+# US tickers scraped from international indices (non-S&P 500 US-listed companies)
+EXTRA_US_TICKERS = [
+    'A', 'AAL', 'ABBV', 'ACN', 'ADM', 'AEP', 'AFL', 'ALL', 'AMP',
+    'ANET', 'APD', 'ARE', 'AVGO', 'AXP', 'BA', 'BALL', 'BAX', 'BDX',
+    'BG', 'BIIB', 'BK', 'BLK', 'BMY', 'BR', 'BSX', 'BXP', 'CAH',
+    'CAT', 'CB', 'CBOE', 'CCI', 'CDNS', 'CDW', 'CEG', 'CF', 'CFG',
+    'CHD', 'CHRW', 'CHTR', 'CI', 'CL', 'CLX', 'CMCSA', 'CME', 'CMG',
+    'CMI', 'CMS', 'COST', 'CPAY', 'CPRT', 'CPT', 'CRH', 'CRL', 'CRM',
+    'CRWD', 'CSCO', 'CSGP', 'CSX', 'CTAS', 'CTSH', 'CTVA', 'CVS', 'CVX',
+    'DAL', 'DASH', 'DD', 'DDOG', 'DE', 'DECK', 'DELL', 'DG', 'DGX',
+    'DHI', 'DHR', 'DIS', 'DLR', 'DLTR', 'DOC', 'DOV', 'DOW', 'DPZ',
+    'DRI', 'DTE', 'DUK', 'DVN', 'DXCM', 'EA', 'EBAY', 'ECL', 'ED',
+    'EFX', 'EG', 'EIX', 'EL', 'ELV', 'EME', 'EMR', 'EOG', 'EQIX',
+    'EQR', 'EQT', 'ES', 'ESS', 'ETN', 'ETR', 'EVRG', 'EW', 'EXC',
+    'EXPD', 'EXPE', 'EXR', 'F', 'FANG', 'FAST', 'FCX', 'FDS', 'FDX',
+    'FE', 'FFIV', 'FICO', 'FIS', 'FISV', 'FITB', 'FIX', 'FLEX', 'FOX',
+    'FOXA', 'FRT', 'FSLR', 'FTNT', 'FTV', 'GD', 'GDDY', 'GE', 'GEN',
+    'GILD', 'GIS', 'GL', 'GLW', 'GM', 'GNRC', 'GPC', 'GPN', 'GRMN',
+    'GS', 'GWW', 'HAL', 'HAS', 'HBAN', 'HCA', 'HD', 'HIG', 'HII',
+    'HLT', 'HON', 'HOOD', 'HPE', 'HPQ', 'HRL', 'HSIC', 'HST', 'HSY',
+    'HUM', 'HWM', 'IBM', 'ICE', 'IDXX', 'IFF', 'INCY', 'INTC', 'INTU',
+    'INVH', 'IP', 'IPG', 'IQV', 'IR', 'IRM', 'ISRG', 'IT', 'ITW',
+    'IVZ', 'J', 'JBHT', 'JBL', 'JCI', 'JKHY', 'JNJ', 'JPM', 'KDP',
+    'KEY', 'KEYS', 'KHC', 'KIM', 'KKR', 'KLAC', 'KMB', 'KMI', 'KO',
+    'KR', 'KVUE', 'L', 'LDOS', 'LEN', 'LH', 'LHX', 'LII', 'LIN',
+    'LITE', 'LLY', 'LMT', 'LNT', 'LOW', 'LRCX', 'LULU', 'LUV', 'LVS',
+    'LYB', 'LYV', 'MA', 'MAA', 'MAR', 'MAS', 'MCD', 'MCHP', 'MCK',
+    'MCO', 'MDLZ', 'MDT', 'MET', 'META', 'MGM', 'MKC', 'MLM', 'MMM',
+    'MNST', 'MO', 'MOS', 'MPC', 'MPWR', 'MRK', 'MRNA', 'MRVL', 'MS',
+    'MSCI', 'MSFT', 'MSI', 'MTB', 'MTD', 'MU', 'NCLH', 'NDAQ', 'NDSN',
+    'NEE', 'NEM', 'NFLX', 'NI', 'NKE', 'NOC', 'NOW', 'NRG', 'NSC',
+    'NTAP', 'NTRS', 'NUE', 'NVDA', 'NVR', 'NWS', 'NWSA', 'NXPI', 'O',
+    'ODFL', 'OKE', 'OMC', 'ON', 'ORCL', 'ORLY', 'OTIS', 'OXY', 'PANW',
+    'PAYX', 'PCAR', 'PCG', 'PEG', 'PEP', 'PFE', 'PFG', 'PG', 'PGR',
+    'PH', 'PHM', 'PKG', 'PLD', 'PLTR', 'PM', 'PNC', 'PNR', 'PNW',
+    'PODD', 'PPG', 'PPL', 'PRU', 'PSA', 'PSKY', 'PSX', 'PTC', 'PWR',
+    'PYPL', 'QCOM', 'RCL', 'REG', 'REGN', 'RF', 'RJF', 'RL', 'RMD',
+    'ROK', 'ROL', 'ROP', 'ROST', 'RSG', 'RTX', 'SBAC', 'SBUX', 'SCHW',
+    'SHW', 'SJM', 'SLB', 'SMCI', 'SNA', 'SNDK', 'SNPS', 'SO', 'SPG',
+    'SPGI', 'SRE', 'STE', 'STLD', 'STT', 'STX', 'STZ', 'SW', 'SWK',
+    'SWKS', 'SYF', 'SYK', 'SYY', 'T', 'TAP', 'TDG', 'TDY', 'TEL',
+    'TER', 'TFC', 'TGT', 'TJX', 'TKO', 'TMO', 'TMUS', 'TPL', 'TPR',
+    'TRGP', 'TRMB', 'TROW', 'TRV', 'TSCO', 'TSLA', 'TSN', 'TT', 'TTD',
+    'TTWO', 'TXN', 'TXT', 'TYL', 'UAL', 'UBER', 'UDR', 'UHS', 'ULTA',
+    'UNH', 'UNP', 'UPS', 'URI', 'USB', 'V', 'VEEV', 'VICI', 'VLO',
+    'VLTO', 'VMC', 'VRSK', 'VRSN', 'VRT', 'VRTX', 'VST', 'VTR', 'VTRS',
+    'VZ', 'WAB', 'WAT', 'WBD', 'WDAY', 'WDC', 'WEC', 'WELL', 'WFC',
+    'WM', 'WMB', 'WMT', 'WRB', 'WSM', 'WST', 'WTW', 'WY', 'WYNN',
+    'XEL', 'XOM', 'XYL', 'XYZ', 'YUM', 'ZBH', 'ZBRA', 'ZTS',
+]
+
+# ---------------------------------------------------------------------------
+# Wikipedia enrichment URLs (for additional index scraping)
+# ---------------------------------------------------------------------------
+
+# Wikipedia pages for major global indices
+# Format: (name, url)
+WIKIPEDIA_INDEX_URLS = [
+    # USA indices
+    ("Nasdaq 100", "https://en.wikipedia.org/wiki/Nasdaq-100"),
+    ("Russell 2000", "https://en.wikipedia.org/wiki/Russell_2000_Index"),
+    # UK
+    ("FTSE 100", "https://en.wikipedia.org/wiki/FTSE_100_Index"),
+    ("FTSE 250", "https://en.wikipedia.org/wiki/FTSE_250_Index"),
+    # Europe
+    ("DAX", "https://en.wikipedia.org/wiki/DAX"),
+    ("Nikkei 225", "https://en.wikipedia.org/wiki/Nikkei_225"),
+    ("CAC 40", "https://en.wikipedia.org/wiki/CAC_40"),
+    ("IBEX 35", "https://en.wikipedia.org/wiki/IBEX_35"),
+    ("FTSE MIB", "https://en.wikipedia.org/wiki/FTSE_MIB"),
+    ("SMI", "https://en.wikipedia.org/wiki/Swiss_Market_Index"),
+    ("AEX", "https://en.wikipedia.org/wiki/AEX_Index"),
+    ("OBX", "https://en.wikipedia.org/wiki/OBX"),
+    ("WIG20", "https://en.wikipedia.org/wiki/WIG20"),
+    ("ATX", "https://en.wikipedia.org/wiki/Austrian_Stock_Exchange"),
+    # Asia
+    ("Hang Seng", "https://en.wikipedia.org/wiki/Hang_Seng_Index"),
+    ("KOSPI", "https://en.wikipedia.org/wiki/KOSPI"),
+    ("ASX 200", "https://en.wikipedia.org/wiki/ASX_200"),
+    ("STI", "https://en.wikipedia.org/wiki/Straits_Times_Index"),
+    ("KLCI", "https://en.wikipedia.org/wiki/FBM_KLCI"),
+    ("SET", "https://en.wikipedia.org/wiki/SET_Index"),
+    ("IBOVESPA", "https://en.wikipedia.org/wiki/IBOVESPA"),
+    ("TSX Composite", "https://en.wikipedia.org/wiki/S%26P/TSX_Composite_Index"),
+]
 
 # ---------------------------------------------------------------------------
 # Helper: scrape index constituents via Wikipedia
@@ -251,7 +381,7 @@ def _extract_tickers_from_table(html: str, ticker_col: int = 0) -> list[str]:
     """Simple HTML table parser — extract ticker-like strings from td elements."""
     if not html:
         return []
-    # Find the main sortable table (Wikimedia convention)
+    # Find the main sortable table
     table_m = re.search(
         r'id="mwOw"[^>]*>.*?</table>', html, re.DOTALL
     )
@@ -280,57 +410,70 @@ def _extract_from_rows(table_html: str, ticker_col: int) -> list[str]:
         if len(tds) <= ticker_col:
             continue
         cell = re.sub(r'<[^>]+>', '', tds[ticker_col]).strip()
-        if re.match(r'^[A-Z]{1,5}(\.?\w*)$', cell):
+        # Match US tickers and international with suffix
+        if re.match(r'^[A-Z]{1,5}(\.\w+)?$', cell) or re.match(r'^\d{6}(\.\w+)?$', cell):
             tickers.add(cell)
     return sorted(tickers)
 
 
-def _fetch_nasdaq100() -> list[str]:
-    """Fetch Nasdaq 100 constituents from Wikipedia."""
-    html = _fetch_wikipedia("https://en.wikipedia.org/wiki/Nasdaq-100")
-    if html:
-        # Try multiple column positions
-        for col in (0, 1, 2):
-            tickers = _extract_tickers_from_table(html, col)
-            if tickers:
-                return tickers
-    return []
+def _fetch_from_wikipedia() -> list[str]:
+    """Fetch tickers from all Wikipedia index URLs.
+    
+    Returns a list of tickers found across all pages.
+    """
+    all_tickers = set()
+    
+    for name, url in WIKIPEDIA_INDEX_URLS:
+        html = _fetch_wikipedia(url)
+        if html:
+            # Try multiple column positions
+            for col in range(5):
+                tickers = _extract_tickers_from_table(html, col)
+                if tickers:
+                    all_tickers.update(tickers)
+                    logger.info(f"  {name}: {len(tickers)} tickers (col {col})")
+                    break
+        else:
+            logger.debug(f"Could not fetch {name} from Wikipedia")
+        
+        time.sleep(0.8)  # Be polite to Wikipedia
+    
+    return sorted(all_tickers)
 
 
-def _fetch_russell2000() -> list[str]:
-    """Fetch Russell 2000 constituents from Wikipedia."""
-    html = _fetch_wikipedia("https://en.wikipedia.org/wiki/Russell_2000_Index")
-    if html:
-        return _extract_tickers_from_table(html, 0)
-    return []
-
-
-def _fetch_swedish_omx100() -> list[str]:
-    """Fetch broader Swedish market tickers from Nasdaq Stockholm page."""
-    html = _fetch_wikipedia("https://en.wikipedia.org/wiki/Nasdaq_Stockholm")
-    if html:
-        return _extract_tickers_from_table(html, 0)
-    return []
-
-
-def _fetch_indian_sensex() -> list[str]:
-    """Fetch BSE SENSEX constituents from Wikipedia."""
-    html = _fetch_wikipedia("https://en.wikipedia.org/wiki/Sensex")
-    if html:
-        # SENSEX table has ticker in different columns
-        for col in range(5):
-            tickers = _extract_tickers_from_table(html, col)
-            if tickers:
-                return tickers
-    return []
-
-
-def _fetch_china_sse() -> list[str]:
-    """Fetch SSE Composite constituents from Wikipedia."""
-    html = _fetch_wikipedia("https://en.wikipedia.org/wiki/SSE_Composite_Index")
-    if html:
-        return _extract_tickers_from_table(html, 0)
-    return []
+def _enrich_from_yfinance_screens() -> list[str]:
+    """Fetch tickers from yfinance predefined screens."""
+    try:
+        import yfinance as yf
+        
+        all_tickers = set()
+        screens = ['day_gainers', 'day_losers', 'most_actives']
+        
+        for screen_name in screens:
+            try:
+                logger.debug(f"Trying yfinance screen: {screen_name}")
+                # yfinance screen API
+                screen_query = yf.screener.query.MarketScreensQuery()
+                screen = screen_query.get_screener_by_name(screen_name)
+                if screen:
+                    result = screen.search()
+                    if result and 'quotes' in result:
+                        for q in result['quotes']:
+                            ticker = q.get('symbol', '')
+                            if ticker:
+                                all_tickers.add(ticker)
+            except Exception as e:
+                logger.debug(f"yfinance screen {screen_name} failed: {e}")
+            
+            time.sleep(1.0)
+        
+        return sorted(all_tickers)
+    except ImportError:
+        logger.debug("yfinance not available for screen scraping")
+        return []
+    except Exception as e:
+        logger.debug(f"yfinance screen scraping failed: {e}")
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -338,47 +481,73 @@ def _fetch_china_sse() -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _enrich_universe_from_sources() -> dict[str, list[str]]:
-    """Fetch additional index constituents and merge with built-in lists.
-
+    """Fetch additional index constituents and merge with embedded lists.
+    
     Each region starts from its embedded reference list, then enriches with
-    any tickers found from Wikipedia scraping.  Generous delays between
-    requests to avoid rate-limiting.
+    any tickers found from Wikipedia scraping and yfinance screens.
     """
-    from collections import OrderedDict
-
     # Start with embedded reference lists
     universe = {
-        'usa': list(set(USA_SP500_TICKERS + USA_ADDITIONAL_TICKERS)),
+        'usa': list(set(USA_SP500_TICKERS + EXTRA_US_TICKERS)),
         'sweden': list(set(SWEDEN_TICKERS)),
         'india': list(set(INDIA_TICKERS)),
         'china': list(set(CHINA_TICKERS)),
     }
-
-    sources = [
-        ('usa', _fetch_nasdaq100, "Nasdaq 100"),
-        ('usa', _fetch_russell2000, "Russell 2000"),
-        ('sweden', _fetch_swedish_omx100, "OMX Stockholm"),
-        ('india', _fetch_indian_sensex, "BSE SENSEX"),
-        ('china', _fetch_china_sse, "SSE Composite"),
-    ]
-
-    for region, fetch_fn, name in sources:
-        try:
-            tickers = fetch_fn()
-            if tickers:
-                before = len(universe[region])
-                universe[region].extend(tickers)
-                universe[region] = sorted(set(universe[region]))
-                logger.info(f"Enriched {region} with {name}: +{len(tickers)} tickers "
-                            f"(total now {len(universe[region])})")
-            else:
-                logger.debug(f"Could not fetch {name} constituents")
-        except Exception as e:
-            logger.warning(f"Error fetching {name} for {region}: {e}")
-
-        # Be generous between requests
-        time.sleep(0.8)
-
+    
+    # Add international tickers
+    universe['international'] = list(set(INTERNATIONAL_TICKERS))
+    
+    # Add scraped tickers from Wikipedia (enriches existing regions)
+    logger.info("Fetching additional tickers from Wikipedia...")
+    wiki_tickers = _fetch_from_wikipedia()
+    
+    if wiki_tickers:
+        # Split into US vs international
+        us_tickers = [t for t in wiki_tickers if '.' not in t and len(t) <= 5 and t.isalpha() and t.isupper()]
+        intl_tickers = [t for t in wiki_tickers if '.' in t]
+        
+        # Add to international region
+        universe['international'].extend(intl_tickers)
+        universe['international'] = sorted(set(universe['international']))
+        
+        # Add US tickers to usa region
+        universe['usa'].extend(us_tickers)
+        universe['usa'] = sorted(set(universe['usa']))
+        
+        logger.info(f"Wikipedia enrichment: +{len(us_tickers)} US, +{len(intl_tickers)} international tickers")
+    
+    # Add yfinance screen tickers
+    logger.info("Fetching additional tickers from yfinance screens...")
+    yf_tickers = _enrich_from_yfinance_screens()
+    if yf_tickers:
+        universe['usa'].extend(yf_tickers)
+        universe['usa'] = sorted(set(universe['usa']))
+        logger.info(f"yfinance screen enrichment: +{len(yf_tickers)} tickers")
+    
+    # Add additional regions by splitting international tickers
+    # Parse suffixes to assign to regions
+    suffix_map = {
+        '.L': 'uk', '.DE': 'germany', '.PA': 'france', '.T': 'japan',
+        '.TO': 'canada', '.AX': 'australia', '.KS': 'southkorea',
+        '.SI': 'singapore', '.SW': 'switzerland', '.AS': 'netherlands',
+        '.SA': 'brazil', '.HK': 'hongkong', '.MX': 'mexico', '.JK': 'indonesia',
+        '.BK': 'thailand', '.KL': 'malaysia', '.PH': 'philippines',
+        '.CAI': 'egypt', '.TL': 'israel', '.IS': 'turkey', '.LN': 'nigeria',
+        '.J': 'southafrica', '.WA': 'poland', '.OL': 'norway',
+        '.CO': 'denmark', '.HE': 'finland', '.VI': 'austria',
+        '.MC': 'spain', '.MI': 'italy', '.ST': 'sweden',
+    }
+    
+    # Create region-specific lists from international tickers
+    for suffix, region in suffix_map.items():
+        suffix_tickers = [t for t in universe['international'] if t.endswith(suffix)]
+        if suffix_tickers:
+            universe[region] = sorted(set(suffix_tickers))
+            logger.info(f"  {region}: {len(suffix_tickers)} tickers")
+    
+    # Remove duplicates from international after splitting
+    universe['international'] = sorted(set(universe['international']))
+    
     return universe
 
 
@@ -428,21 +597,23 @@ def _is_cache_fresh(cache: dict) -> bool:
 # Public API
 # ---------------------------------------------------------------------------
 
-def _build_universe() -> dict[str, list[str]]:
+def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
     """Build the ticker universe: try cache → enrich → save.
-
-    Returns dict[str, list[str]] with keys 'usa', 'sweden', 'india', 'china'.
+    
+    Args:
+        force_refresh: If True, skip cache and fetch live data.
     """
-    # Try cache first
-    cache = _read_cache()
-    if cache and _is_cache_fresh(cache):
-        logger.debug("Using cached universe data")
-        return cache['tickers']
-
+    # Try cache first (only if not forcing refresh)
+    if not force_refresh:
+        cache = _read_cache()
+        if cache and _is_cache_fresh(cache):
+            logger.debug("Using cached universe data")
+            return cache['tickers']
+    
     # Build from sources
-    logger.info("Building universe from reference lists + online enrichment")
+    logger.info("Building universe from embedded lists + online enrichment")
     universe = _enrich_universe_from_sources()
-
+    
     # Save to cache
     _write_cache(universe)
     logger.info(f"Universe built: {dict((k, len(v)) for k, v in universe.items())}")
@@ -453,38 +624,47 @@ def _build_universe() -> dict[str, list[str]]:
 _universe_cache: Optional[dict[str, list[str]]] = None
 
 
-def get_universe(region: str | None = None) -> list[str] | dict[str, list[str]]:
+def get_universe(region: str | None = None, force_refresh: bool = False) -> list[str] | dict[str, list[str]]:
     """Get ticker universe.
-
+    
     Args:
-        region: Region key ('usa', 'sweden', 'india', 'china') or None for all.
-
+        region: Region key or None for all.
+        force_refresh: If True, skip cache and fetch live data.
+    
     Returns:
         If region is specified, returns list[str] of tickers for that region.
         If region is None, returns dict[str, list[str]] of all regions.
     """
     global _universe_cache
-    if _universe_cache is None:
-        _universe_cache = _build_universe()
-
+    if _universe_cache is None or force_refresh:
+        _universe_cache = _build_universe(force_refresh)
+    
     if region is None:
         return dict(_universe_cache)
-
+    
     return list(_universe_cache.get(region, []))
 
 
 def get_universe_count() -> dict[str, int]:
-    """Return dict of region -> number of tickers."""
-    universe = get_universe()
-    return {region: len(tickers) for region, tickers in universe.items()}
+    """Return dict of region -> number of tickers (embedded only, no scraping)."""
+    return {
+        'usa': len(set(USA_SP500_TICKERS + EXTRA_US_TICKERS)),
+        'sweden': len(SWEDEN_TICKERS),
+        'india': len(INDIA_TICKERS),
+        'china': len(CHINA_TICKERS),
+        'international': len(INTERNATIONAL_TICKERS),
+    }
 
 
 def get_all_tickers() -> list[str]:
-    """Return all unique tickers across all regions."""
-    universe = get_universe()
+    """Return all unique tickers across embedded lists (no scraping)."""
     all_tickers = set()
-    for tickers in universe.values():
-        all_tickers.update(tickers)
+    all_tickers.update(USA_SP500_TICKERS)
+    all_tickers.update(EXTRA_US_TICKERS)
+    all_tickers.update(SWEDEN_TICKERS)
+    all_tickers.update(INDIA_TICKERS)
+    all_tickers.update(CHINA_TICKERS)
+    all_tickers.update(INTERNATIONAL_TICKERS)
     return sorted(all_tickers)
 
 
@@ -499,13 +679,13 @@ def get_region_count() -> dict[str, int]:
 
 
 def get_total_count() -> int:
-    """Return total number of unique tickers across all regions."""
+    """Return total number of unique tickers across embedded lists."""
     return len(get_all_tickers())
 
 
 # Region configuration (kept for backward compatibility)
 REGIONS = {
-    'usa': list(USA_SP500_TICKERS + USA_ADDITIONAL_TICKERS),
+    'usa': list(set(USA_SP500_TICKERS + EXTRA_US_TICKERS)),
     'sweden': list(SWEDEN_TICKERS),
     'india': list(INDIA_TICKERS),
     'china': list(CHINA_TICKERS),
@@ -516,4 +696,33 @@ REGION_LABELS = {
     'sweden': 'Sweden',
     'china': 'China',
     'india': 'India',
+    'uk': 'United Kingdom',
+    'germany': 'Germany',
+    'japan': 'Japan',
+    'canada': 'Canada',
+    'australia': 'Australia',
+    'france': 'France',
+    'southkorea': 'South Korea',
+    'singapore': 'Singapore',
+    'switzerland': 'Switzerland',
+    'netherlands': 'Netherlands',
+    'brazil': 'Brazil',
+    'hongkong': 'Hong Kong',
+    'mexico': 'Mexico',
+    'indonesia': 'Indonesia',
+    'thailand': 'Thailand',
+    'malaysia': 'Malaysia',
+    'philippines': 'Philippines',
+    'egypt': 'Egypt',
+    'israel': 'Israel',
+    'turkey': 'Turkey',
+    'southafrica': 'South Africa',
+    'poland': 'Poland',
+    'norway': 'Norway',
+    'denmark': 'Denmark',
+    'finland': 'Finland',
+    'austria': 'Austria',
+    'spain': 'Spain',
+    'italy': 'Italy',
 }
+
