@@ -26,9 +26,11 @@ async def main() -> None:
     register_handlers(application)
 
     logger.info("Stock Scan Pro starting...")
-    async with application:
-        logger.info("Bot is polling Telegram...")
-        await application.run_polling()
+    await application.initialize()
+    await application.start()
+
+    logger.info("Bot is polling Telegram...")
+    await application.run_polling()
 
 
 if __name__ == "__main__":
