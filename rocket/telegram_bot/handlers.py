@@ -92,7 +92,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "• /unsubscribe <ticker> — stop alerts\n"
         "• /signal <ticker> — scan now\n"
         "• /status <ticker> — check signal\n"
-        "• /scanall — scan all tickers (admin only)\n\n"
+        "• /scanall — scan all tickers, show top 10 (admin only)\n"
+        "• /history — view last 5 scans (admin only)\n\n"
         "📋 *Portfolio*\n"
         "• /list — show all subscriptions\n\n"
         "👤 *Account*\n"
@@ -280,8 +281,28 @@ def _run_scan_region(region: str):
     return engine.scan_region(region)
 
 
+async def _do_scanall(update: Update):
+    """Run the full multi-region scan and return (top_10, total_count)."""
+    storage = _get_engine().storage
+
+    for region in ["usa", "sweden", "china", "india"]:
+        await update.message.reply_chat_action(action="typing")
+        await asyncio.get_event_loop().run_in_executor(
+            _scan_executor, _run_scan_region, region
+        )
+
+    top_10 = storage.get_top_signals(10)
+    # Total rows in scan_history = all signals across all scans
+    row = storage._conn.execute(
+        "SELECT COUNT(*) FROM scan_history"
+    ).fetchone()
+    total = row[0] if row else 0
+    return top_10, total
+
+
 async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin-only: scan all tickers across all regions (non-blocking)."""
+    """Admin-only: scan all tickers across all regions (non-blocking).
+    Shows Top 10 from scan_history by score after scan completes."""
     chat_id = update.effective_user.id
     admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
     if chat_id != admin_chat_id:
@@ -290,44 +311,81 @@ async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await update.message.reply_text("🌍 Scanning all regions… This will take a few minutes.")
 
-    loop = asyncio.get_event_loop()
+    top_10, total = await _do_scanall(update)
 
-    async def _scan_all():
-        all_events = []
-        for region in ["usa", "sweden", "china", "india"]:
-            await update.message.reply_chat_action(action="typing")
-            events = await loop.run_in_executor(
-                _scan_executor, _run_scan_region, region
-            )
-            if events:
-                all_events.extend(events)
-        return all_events
-
-    all_events = await _scan_all()
-
-    if not all_events:
-        await update.message.reply_text("⚠️ No signals found.")
+    if not top_10:
+        await update.message.reply_text(
+            "No scan data yet — run /scanall first"
+        )
         return
 
-    buy_count = sum(1 for e in all_events if e.signal.value == "BUY")
-    sell_count = sum(1 for e in all_events if e.signal.value == "SELL")
-    hold_count = sum(1 for e in all_events if e.signal.value == "HOLD")
+    buy_count = sum(1 for row in top_10 if row[1] == "BUY")
+    sell_count = sum(1 for row in top_10 if row[1] == "SELL")
+    hold_count = sum(1 for row in top_10 if row[1] == "HOLD")
 
-    sorted_events = sorted(all_events, key=lambda e: e.score, reverse=True)[:10]
-
-    summary_lines = [
-        "🌍 *Scan Complete*",
-        f"Total events: {len(all_events)}",
+    lines = [
+        "📊 *TOP 10 FROM LAST SCAN*",
+        f"Total events scanned: {total}",
         f"BUY: {buy_count}  SELL: {sell_count}  HOLD: {hold_count}",
         "",
-        "Top signals:",
+        "*Top 10 signals:*",
     ]
-    for ev in sorted_events:
-        summary_lines.append(
-            f"• {ev.ticker}: {ev.signal.value} (score={ev.score:.2f})"
+    for rank, (ticker, signal, score, category, buy_c, sell_c, reason) in enumerate(
+        top_10, start=1
+    ):
+        lines.append(
+            f"{rank}. *{ticker}*: {signal} (score={score:.2f})"
+        )
+        if reason:
+            lines.append(f"   ↳ {reason}")
+
+    await update.message.reply_text(
+        "\n".join(lines), parse_mode="Markdown"
+    )
+    logger.info(f"Admin {chat_id} ran /scanall — top {len(top_10)} signals shown")
+
+
+async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show the last 5 scans with signal counts per scan."""
+    chat_id = update.effective_user.id
+    admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
+    if chat_id != admin_chat_id:
+        await update.message.reply_text("🔒 Admin only")
+        return
+
+    storage = _get_engine().storage
+
+    # Query the last 5 distinct scan timestamps with their total signal counts.
+    rows = storage._conn.execute(
+        """
+        SELECT timestamp,
+               COUNT(*)       AS total,
+               SUM(CASE WHEN signal='BUY'   THEN 1 ELSE 0 END) AS buys,
+               SUM(CASE WHEN signal='SELL'  THEN 1 ELSE 0 END) AS sells,
+               SUM(CASE WHEN signal='HOLD'  THEN 1 ELSE 0 END) AS holds
+        FROM scan_history
+        GROUP BY timestamp
+        ORDER BY timestamp DESC
+        LIMIT 5
+        """
+    ).fetchall()
+
+    if not rows:
+        await update.message.reply_text(
+            "No scan history yet — run /scanall first"
+        )
+        return
+
+    lines = ["🕓 *Scan History (last 5)*", ""]
+    for ts, total, buys, sells, holds in rows:
+        dt = datetime.fromisoformat(ts).strftime("%Y-%m-%d %H:%M UTC")
+        lines.append(
+            f"📅 {dt}  —  "
+            f"Total: {total}  |  "
+            f"BUY: {buys}  SELL: {sells}  HOLD: {holds}"
         )
 
     await update.message.reply_text(
-        "\n".join(summary_lines), parse_mode="Markdown"
+        "\n".join(lines), parse_mode="Markdown"
     )
-    logger.info(f"Admin {chat_id} ran /scanall")
+    logger.info(f"Admin {chat_id} viewed /history")
