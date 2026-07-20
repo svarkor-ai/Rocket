@@ -26,13 +26,8 @@ async def main() -> None:
     register_handlers(application)
 
     logger.info("Stock Scan Pro starting...")
-    await application.initialize()
-    await application.start()
-
-    # Start background polling
     async with application:
         logger.info("Bot is polling Telegram...")
-        await application.post_init(None)
         await application.run_polling()
 
 
