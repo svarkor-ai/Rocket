@@ -1,6 +1,8 @@
 """Handler coroutines for Telegram /commands."""
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import os
 import sqlite3
 import logging
@@ -270,22 +272,38 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await start_command(update, context)
 
 
+_scan_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+
+def _run_scan_region(region: str):
+    engine = _get_engine()
+    return engine.scan_region(region)
+
+
 async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin-only: scan all tickers across all regions."""
+    """Admin-only: scan all tickers across all regions (non-blocking)."""
     chat_id = update.effective_user.id
     admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
     if chat_id != admin_chat_id:
         await update.message.reply_text("🔒 Admin only")
         return
 
-    engine = _get_engine()
-    regions = ["usa", "sweden", "china", "india"]
-    all_events = []
+    await update.message.reply_text("🌍 Scanning all regions… This will take a few minutes.")
 
-    for region in regions:
-        events = engine.scan_region(region)
-        if events:
-            all_events.extend(events)
+    loop = asyncio.get_event_loop()
+
+    async def _scan_all():
+        all_events = []
+        for region in ["usa", "sweden", "china", "india"]:
+            await update.message.reply_chat_action(action="typing")
+            events = await loop.run_in_executor(
+                _scan_executor, _run_scan_region, region
+            )
+            if events:
+                all_events.extend(events)
+        return all_events
+
+    all_events = await _scan_all()
 
     if not all_events:
         await update.message.reply_text("⚠️ No signals found.")
@@ -295,7 +313,6 @@ async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     sell_count = sum(1 for e in all_events if e.signal.value == "SELL")
     hold_count = sum(1 for e in all_events if e.signal.value == "HOLD")
 
-    # Sort by score descending, take top 10
     sorted_events = sorted(all_events, key=lambda e: e.score, reverse=True)[:10]
 
     summary_lines = [
