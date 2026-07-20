@@ -18,6 +18,8 @@ class SignalEvent:
     reason: str           # human-readable explanation
     timestamp: datetime
     timeframe: str        # "daily" or "intraday"
+    buy_count: int = 0    # number of buy indicators
+    sell_count: int = 0   # number of sell indicators
 
 
 @dataclass
