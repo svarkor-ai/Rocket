@@ -174,14 +174,7 @@ def main():
 
     summary = run(regions, test=args.test)
 
-    print(f"\n{'='*60}")
-    print(f"Nightly scan complete:")
-    print(f"  Regions: {summary['regions']}")
-    print(f"  Tickers scanned: {summary['tickers']}")
-    print(f"  Signals emitted: {summary['signals']}")
-    print(f"  BUY: {summary['buys']} | SELL: {summary['sells']} | HOLD: {summary['holds']}")
-    print(f"  DB: {DB_PATH}")
-    print(f"{'='*60}")
+    print(f"Scanned {summary['regions']} regions, {summary['tickers']} total tickers, {summary['signals']} signals emitted")
 
 
 if __name__ == "__main__":

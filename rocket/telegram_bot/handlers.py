@@ -281,41 +281,36 @@ def _run_scan_region(region: str):
     return engine.scan_region(region)
 
 
-async def _do_scanall(update: Update):
-    """Run the full multi-region scan and return (top_10, total_count)."""
-    storage = _get_engine().storage
-
-    for region in ["usa", "sweden", "china", "india"]:
-        await update.message.reply_chat_action(action="typing")
-        await asyncio.get_event_loop().run_in_executor(
-            _scan_executor, _run_scan_region, region
-        )
-
-    top_10 = storage.get_top_signals(10)
-    # Total rows in scan_history = all signals across all scans
-    row = storage._conn.execute(
-        "SELECT COUNT(*) FROM scan_history"
-    ).fetchone()
-    total = row[0] if row else 0
-    return top_10, total
-
-
 async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin-only: scan all tickers across all regions (non-blocking).
-    Shows Top 10 from scan_history by score after scan completes."""
+    """Admin-only: show Top 10 from the latest scan in scan_history (non-blocking)."""
     chat_id = update.effective_user.id
     admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
     if chat_id != admin_chat_id:
         await update.message.reply_text("🔒 Admin only")
         return
 
-    await update.message.reply_text("🌍 Scanning all regions… This will take a few minutes.")
+    await update.message.reply_chat_action(action="typing")
 
-    top_10, total = await _do_scanall(update)
+    loop = asyncio.get_event_loop()
+
+    async def _get_top_signals():
+        db_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "data", "signals.db"
+        )
+        storage = SignalStorage(db_path)
+        top_10 = storage.get_top_signals(10)
+        total_row = storage._conn.execute(
+            "SELECT COUNT(*) FROM scan_history"
+        ).fetchone()
+        total = total_row[0] if total_row else 0
+        storage.close()
+        return top_10, total
+
+    top_10, total = await _get_top_signals()
 
     if not top_10:
         await update.message.reply_text(
-            "No scan data yet — run /scanall first"
+            "⚠️ No scan data yet. Run a scan first (e.g. nightly_scan)."
         )
         return
 
@@ -324,8 +319,8 @@ async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     hold_count = sum(1 for row in top_10 if row[1] == "HOLD")
 
     lines = [
-        "📊 *TOP 10 FROM LAST SCAN*",
-        f"Total events scanned: {total}",
+        "🌍 *Top 10 Signals (latest scan)*",
+        f"Total events in history: {total}",
         f"BUY: {buy_count}  SELL: {sell_count}  HOLD: {hold_count}",
         "",
         "*Top 10 signals:*",
