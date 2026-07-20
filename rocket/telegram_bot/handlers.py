@@ -84,17 +84,21 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     store.create_user(chat_id, username)
 
     help_text = (
-         "🚀 *Stock Scan Pro Bot*\\n\\n"
-         "Commands:\\n"
-         "/subscribe <ticker> — get signal alerts (max 3 free)\\n"
-         "/unsubscribe <ticker> — stop alerts\\n"
-         "/signal <ticker> — scan now\\n"
-         "/status <ticker> — check signal\\n"
-         "/list — show all subscriptions\\n"
-         "/plan — visa planer och priser\\n"
-         "/userstatus — visa din status\\n"
-         "/help — this message\\n"
-     )
+        "🚀 *Stock Scan Pro Bot*\n\n"
+        "📊 *Trading*\n"
+        "• /subscribe <ticker> — get signal alerts (max 3 free)\n"
+        "• /unsubscribe <ticker> — stop alerts\n"
+        "• /signal <ticker> — scan now\n"
+        "• /status <ticker> — check signal\n"
+        "• /scanall — scan all tickers (admin only)\n\n"
+        "📋 *Portfolio*\n"
+        "• /list — show all subscriptions\n\n"
+        "👤 *Account*\n"
+        "• /plan — view plans and prices\n"
+        "• /userstatus — view your status\n\n"
+        "ℹ️ *Help*\n"
+        "• /help — this message\n"
+    )
     await update.message.reply_text(help_text, parse_mode="Markdown")
     logger.info(f"User {chat_id} (/start)")
 
@@ -264,3 +268,49 @@ async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show help text."""
     await start_command(update, context)
+
+
+async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin-only: scan all tickers across all regions."""
+    chat_id = update.effective_chat.id
+    admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
+    if chat_id != admin_chat_id:
+        await update.message.reply_text("🔒 Admin only")
+        return
+
+    engine = _get_engine()
+    regions = ["usa", "sweden", "china", "india"]
+    all_events = []
+
+    for region in regions:
+        events = engine.scan_region(region)
+        if events:
+            all_events.extend(events)
+
+    if not all_events:
+        await update.message.reply_text("⚠️ No signals found.")
+        return
+
+    buy_count = sum(1 for e in all_events if e.signal.value == "BUY")
+    sell_count = sum(1 for e in all_events if e.signal.value == "SELL")
+    hold_count = sum(1 for e in all_events if e.signal.value == "HOLD")
+
+    # Sort by score descending, take top 10
+    sorted_events = sorted(all_events, key=lambda e: e.score, reverse=True)[:10]
+
+    summary_lines = [
+        "🌍 *Scan Complete*",
+        f"Total events: {len(all_events)}",
+        f"BUY: {buy_count}  SELL: {sell_count}  HOLD: {hold_count}",
+        "",
+        "Top signals:",
+    ]
+    for ev in sorted_events:
+        summary_lines.append(
+            f"• {ev.ticker}: {ev.signal.value} (score={ev.score:.2f})"
+        )
+
+    await update.message.reply_text(
+        "\n".join(summary_lines), parse_mode="Markdown"
+    )
+    logger.info(f"Admin {chat_id} ran /scanall")
