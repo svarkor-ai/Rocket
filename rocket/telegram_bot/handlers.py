@@ -17,12 +17,14 @@ from rocket.telegram_bot.notifications import (
 )
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "scan_pro_subscriptions.db")
+USERS_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "users.db")
 
 logger = logging.getLogger(__name__)
 
 # Shared engine/storage — initialised on first use via _get_engine()
-_engine_cache: dict | None = None
-_storage_cache: dict | None = None
+_engine_cache: object | None = None
+_storage_cache: object | None = None
+_user_store_cache: object | None = None
 
 
 def _get_db() -> sqlite3.Connection:
@@ -43,6 +45,14 @@ def _get_db() -> sqlite3.Connection:
     )
     conn.commit()
     return conn
+
+
+def _get_user_store() -> "UserStore":
+    global _user_store_cache
+    if _user_store_cache is None:
+        from rocket.users.store import UserStore
+        _user_store_cache = UserStore(USERS_DB_PATH)
+    return _user_store_cache
 
 
 def _get_engine() -> SignalEngine:
@@ -69,16 +79,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     db.commit()
     db.close()
 
+    # Register user in the user store (auto-creates with free tier)
+    store = _get_user_store()
+    store.create_user(chat_id, username)
+
     help_text = (
-        "🚀 *Stock Scan Pro Bot*\n\n"
-        "Commands:\n"
-        "/subscribe <ticker> — get signal alerts\n"
-        "/unsubscribe <ticker> — stop alerts\n"
-        "/signal <ticker> — scan now\n"
-        "/status <ticker> — check signal\n"
-        "/list — show all subscriptions\n"
-        "/help — this message\n"
-    )
+         "🚀 *Stock Scan Pro Bot*\\n\\n"
+         "Commands:\\n"
+         "/subscribe <ticker> — get signal alerts (max 3 free)\\n"
+         "/unsubscribe <ticker> — stop alerts\\n"
+         "/signal <ticker> — scan now\\n"
+         "/status <ticker> — check signal\\n"
+         "/list — show all subscriptions\\n"
+         "/plan — visa planer och priser\\n"
+         "/user-status — visa din status\\n"
+         "/help — this message\\n"
+     )
     await update.message.reply_text(help_text, parse_mode="Markdown")
     logger.info(f"User {chat_id} (/start)")
 
@@ -92,6 +108,16 @@ async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
     ticker = args[0].upper()
     db = _get_db()
+    store = _get_user_store()
+
+    # Check free-tier limit
+    try:
+        store.add_subscription(chat_id, ticker)
+    except ValueError as e:
+        await update.message.reply_text(f"⚠️ {e}")
+        db.close()
+        return
+
     try:
         db.execute(
             "INSERT INTO subscriptions (chat_id, ticker) VALUES (?, ?)",
@@ -131,11 +157,14 @@ async def unsubscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     ticker = args[0].upper()
     db = _get_db()
+    store = _get_user_store()
     cur = db.execute(
         "DELETE FROM subscriptions WHERE chat_id = ? AND ticker = ?",
         (chat_id, ticker),
     )
     db.commit()
+    # Also remove from user store
+    store.remove_subscription(chat_id, ticker)
     db.close()
     if cur.rowcount:
         await update.message.reply_text(f"🗑 Unsubscribed from {ticker}")
@@ -148,6 +177,7 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """List all subscribed tickers with current signals."""
     chat_id = update.effective_user.id
     db = _get_db()
+    store = _get_user_store()
     rows = db.execute(
         "SELECT ticker FROM subscriptions WHERE chat_id = ? ORDER BY ticker",
         (chat_id,),
@@ -157,8 +187,12 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("No subscriptions yet. Use /subscribe <ticker>.")
         return
     tickers = [r[0] for r in rows]
+    user = store.get_user(chat_id) or store.create_user(chat_id)
+    max_subs = user.max_subscriptions
+    limit_icon = "∞" if max_subs == 999 else str(max_subs)
+
     engine = _get_engine()
-    lines = ["📋 *Your Subscriptions:*"]
+    lines = [f"📋 *Your Subscriptions ({len(tickers)}/{limit_icon}):*\n"]
     for t in tickers:
         state = engine.storage.get_signal_state(t)
         if state:
