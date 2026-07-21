@@ -47,6 +47,10 @@ def _derive_signal(summary: SignalSummary):
 REGION_MAP = {
     "usa": "us", "sweden": "eu", "china": "asia",
     "india": "asia", "international": "us",
+    # New regions
+    "uk": "eu", "germany": "eu", "france": "eu",
+    "japan": "asia", "hongkong": "asia", "australia": "oceania",
+    "canada": "us", "switzerland": "eu", "korea": "asia",
 }
 
 
@@ -173,9 +177,11 @@ def main():
     args = parser.parse_args()
 
     if args.test:
-        regions = ["usa"]
+        regions = ["usa"]  # Keep single region for fast test
     else:
-        regions = ["usa", "sweden", "china", "india", "international"]
+        regions = ["usa", "sweden", "uk", "germany", "france", "japan",
+                   "hongkong", "china", "india", "australia", "canada",
+                   "switzerland", "korea", "international"]
 
     test_limit = getattr(args, 'test_limit', 5)
     summary = run(regions, test=args.test, test_limit=test_limit)
