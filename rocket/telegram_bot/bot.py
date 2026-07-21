@@ -13,9 +13,11 @@ from .handlers import (
     subscribe_command,
     unsubscribe_command,
     list_command,
+    portfolio_command,
     status_command,
     signal_command,
     help_command,
+    om_command,
     scanall_command,
     history_command,
 )
@@ -75,6 +77,7 @@ def register_handlers(application: "Application") -> None:
     application.add_handler(CommandHandler("subscribe", subscribe_command))
     application.add_handler(CommandHandler("unsubscribe", unsubscribe_command))
     application.add_handler(CommandHandler("list", list_command))
+    application.add_handler(CommandHandler("portfolio", portfolio_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("signal", signal_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -83,5 +86,6 @@ def register_handlers(application: "Application") -> None:
     application.add_handler(CommandHandler("adminlist", _make_admin_wrapper(admin_list_command, store, admin_chat_id)))
     application.add_handler(CommandHandler("scanall", scanall_command))
     application.add_handler(CommandHandler("history", history_command))
+    application.add_handler(CommandHandler("om", om_command))
 
     logger.info("Telegram bot handlers registered")

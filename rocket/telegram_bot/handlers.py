@@ -296,6 +296,48 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await start_command(update, context)
 
 
+async def om_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show information about indicators and scoring methodology."""
+    text = (
+        "📊 *Rocket Scanner — Indikatorsystem*\n\n"
+        "Systemet analyserar 18 tekniska indikatorer fördelade på 4 kategorier.\n"
+        "Varje indikator ger en score från -1.0 (köp) till +1.0 (sälj),\n"
+        "då sammanvägs till en overall score.\n\n"
+        "📈 *Momentum* (vikt: 40%)\n"
+        "• RSI — styrka/försvagning av prisrörelse\n"
+        "• MACD — trendmomentum och crossover\n"
+        "• Stochastic — överköpt/översållt\n"
+        "• Williams %R — samma princip som Stochastic\n"
+        "• ROC — rate of change, prisförändringstakt\n"
+        "• CCI — commodity channel index\n\n"
+        "📉 *Trend* (vikt: 30%)\n"
+        "• EMA 9, 21, 50, 200 — exponensiella glidande medelvärden\n"
+        "• EMA Crossover — korsningar mellan korta och långa EMAs\n"
+        "• ADX — trendstyrka (oberoende av riktning)\n\n"
+        "〰️ *Volatilitet* (vikt: 20%)\n"
+        "• Bollinger Bands — prisens position i bands\n"
+        "• ATR — genomsnittlig sannolikhet\n"
+        "• Donchian Channel — högsta/högsta priset\n\n"
+        "📊 *Volym* (vikt: 10%)\n"
+        "• OBV — on-balance volume\n"
+        "• MFI — money flow index\n"
+        "• VWAP — volume-weighted average price\n\n"
+        "☁️ *Avancerade* (ingår i momentum)\n"
+        "• Ichimoku Cloud — helhetssystem\n"
+        "• Supertrend\n"
+        "• Parabolic SAR\n\n"
+        "🎯 *Signaler*\n"
+        "• BUY  — score < -0.5 (stark köpsignal)\n"
+        "• HOLD — score mellan -0.5 och +0.5\n"
+        "• SELL — score > +0.5 (stark säljsignal)\n\n"
+        "🔄 *Uppdatering*\n"
+        "Portfolio-scanen kör var 5:e minut och notifierar vid\n"
+        "signaländring (BUY→HOLD→SELL) för dina prenumerationer."
+    )
+    await update.message.reply_text(text, parse_mode="Markdown")
+    logger.info(f"User {update.effective_user.id} viewed /om")
+
+
 _scan_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 
