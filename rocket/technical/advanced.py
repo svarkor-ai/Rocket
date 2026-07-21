@@ -552,3 +552,106 @@ class RubeGoldberg(BaseIndicator):
         return sar
 
 
+# ── Parabolic SAR ────────────────────────────────────────────────
+@dataclass
+class ParabolicSAR(BaseIndicator):
+    step: float = 0.02
+    max_af: float = 0.2
+
+    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
+        df = self._normalize_columns(df)
+        if len(df) < 5:
+            return IndicatorResult(
+                name="Parabolic SAR", signal=Signal.HOLD, score=0.0,
+                category=SignalCategory.TREND,
+                values={"sar": 0.0, "price": 0.0, "trend": "NONE"},
+            )
+        highs = df['high'].to_numpy(dtype=np.float64)
+        lows = df['low'].to_numpy(dtype=np.float64)
+        closes = df['close'].to_numpy(dtype=np.float64)
+        sar_arr = self._calculate_sar(highs, lows, closes)
+
+        price = closes[-1]
+        sar_val = sar_arr[-1]
+        # Determine trend: if price > SAR → uptrend (BUY)
+        if price > sar_val:
+            signal = Signal.BUY
+            score = normalize_score(min((price - sar_val) / price, 1.0))
+        elif price < sar_val:
+            signal = Signal.SELL
+            score = normalize_score(max(-(sar_val - price) / price, -1.0))
+        else:
+            signal = Signal.HOLD
+            score = 0.0
+
+        return IndicatorResult(
+            name="Parabolic SAR", score=score, signal=signal,
+            category=SignalCategory.TREND,
+            values={"sar": sar_val, "price": price,
+                    "trend": "UP" if price > sar_val else "DOWN"},
+        )
+
+    def _calculate_sar(
+        self, highs: np.ndarray, lows: np.ndarray, closes: np.ndarray
+    ) -> np.ndarray:
+        """Standard Parabolic SAR (EP / AF / step / max accel)."""
+        n = len(closes)
+        if n == 0:
+            return np.array([])
+
+        sar = np.empty(n)
+        step = self.step
+        max_accel = self.max_af
+        af = step
+
+        # Determine initial trend from first few bars
+        trend = 1  # default uptrend
+        if n >= 3 and closes[2] < closes[0]:
+            trend = -1
+
+        if trend == 1:
+            ep = highs[0]
+            sar[0] = min(ep, lows[0])
+            if sar[0] >= closes[0]:
+                sar[0] = closes[0] * 0.99
+        else:
+            ep = lows[0]
+            sar[0] = max(ep, highs[0])
+            if sar[0] <= closes[0]:
+                sar[0] = closes[0] * 1.01
+
+        for i in range(1, n):
+            sar[i] = sar[i - 1] + af * (ep - sar[i - 1])
+
+            if trend == 1:
+                sar[i] = min(sar[i], sar[i - 1])
+                sar[i] = min(sar[i], highs[i - 1])
+
+                if closes[i] < sar[i]:
+                    new_sar = ep
+                    ep = lows[i]
+                    af = step
+                    trend = -1
+                    sar[i] = new_sar
+                else:
+                    if highs[i] > ep:
+                        ep = highs[i]
+                        af = min(af + step, max_accel)
+            else:
+                sar[i] = max(sar[i], sar[i - 1])
+                sar[i] = max(sar[i], lows[i - 1])
+
+                if closes[i] > sar[i]:
+                    new_sar = ep
+                    ep = highs[i]
+                    af = step
+                    trend = 1
+                    sar[i] = new_sar
+                else:
+                    if lows[i] < ep:
+                        ep = lows[i]
+                        af = min(af + step, max_accel)
+
+        return sar
+
+

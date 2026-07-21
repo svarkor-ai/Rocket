@@ -21,11 +21,11 @@ import numpy as np
 from ..data.models import TickerInfo
 from ..technical.families import IndicatorVote, FamilyVote, Vote, FamilyName, combine, compute_family_votes
 from ..technical.signal_combiner import SignalSummary, SignalCombiner  # kept for backward compat
-from ..technical.momentum import RSI, MACD, ROC
-from ..technical.trend import EMACrossover, ADX
-from ..technical.volatility import BollingerBands, ATR
+from ..technical.momentum import RSI, MACD, ROC, Stochastic, WilliamsR, CCI
+from ..technical.trend import EMACrossover, ADX, EMA9, EMA21, EMA50, EMA200
+from ..technical.volatility import BollingerBands, ATR, DonchianChannel
 from ..technical.volume import OBV, MFI, VWAPIndicator
-from ..technical.advanced import IchimokuCloud, Supertrend, AutoTrend, RubeGoldberg
+from ..technical.advanced import IchimokuCloud, Supertrend, AutoTrend, RubeGoldberg, ParabolicSAR
 from ..technical.patterns import (
     DoubleTopBottom, HeadShoulders, WedgePattern,
     AutoFractal, CupAndHandle, PatternDetectorCombined,
@@ -38,28 +38,30 @@ from ..technical.regime import detect_regime, RegimeResult, Regime
 
 # All indicator instances (direction + risk)
 INDICATORS = [
-    # Momentum (3)
-    RSI(), MACD(), ROC(),
-    # Trend (9)
-    EMACrossover(), ADX(), IchimokuCloud(), Supertrend(),
-    AutoTrend(), RubeGoldberg(),
+    # Momentum (6)
+    RSI(), MACD(), ROC(), Stochastic(), WilliamsR(), CCI(),
+    # Trend (14)
+    EMACrossover(), ADX(), EMA9(), EMA21(), EMA50(), EMA200(),
+    IchimokuCloud(), Supertrend(),
+    AutoTrend(), RubeGoldberg(), ParabolicSAR(),
     DoubleTopBottom(), HeadShoulders(),
     WedgePattern(), AutoFractal(), CupAndHandle(),
     PatternDetectorCombined(),
-    # Volatility (2) — risk-only, NOT in direction voting
-    BollingerBands(), ATR(),
+    # Volatility (3) — risk-only, NOT in direction voting
+    BollingerBands(), ATR(), DonchianChannel(),
     # Volume (3)
     OBV(), MFI(), VWAPIndicator(),
 ]
 
 # Direction indicators ONLY — used for family consensus voting
-# BB and ATR are risk-only and must NOT vote in direction pipeline
+# BB, ATR, and DonchianChannel are risk/volatility-only
 DIRECTION_INDICATORS = [
-    # Momentum (3)
-    RSI(), MACD(), ROC(),
-    # Trend (9)
-    EMACrossover(), ADX(), IchimokuCloud(), Supertrend(),
-    AutoTrend(), RubeGoldberg(),
+    # Momentum (6)
+    RSI(), MACD(), ROC(), Stochastic(), WilliamsR(), CCI(),
+    # Trend (14)
+    EMACrossover(), ADX(), EMA9(), EMA21(), EMA50(), EMA200(),
+    IchimokuCloud(), Supertrend(),
+    AutoTrend(), RubeGoldberg(), ParabolicSAR(),
     DoubleTopBottom(), HeadShoulders(),
     WedgePattern(), AutoFractal(), CupAndHandle(),
     PatternDetectorCombined(),
@@ -70,16 +72,26 @@ DIRECTION_INDICATORS = [
 # Mapping from indicator name → family
 # BB and ATR intentionally NOT included — they are risk-only
 _NAME_TO_FAMILY = {
+    # Momentum (6)
     "RSI": FamilyName.MOMENTUM,
     "MACD": FamilyName.MOMENTUM,
     "ROC": FamilyName.MOMENTUM,
+    "Stochastic": FamilyName.MOMENTUM,
+    "Williams %R": FamilyName.MOMENTUM,
+    "CCI": FamilyName.MOMENTUM,
+    # Trend (14)
     "EMACrossover": FamilyName.TREND,
     "ADX": FamilyName.TREND,
+    "EMA9": FamilyName.TREND,
+    "EMA21": FamilyName.TREND,
+    "EMA50": FamilyName.TREND,
+    "EMA200": FamilyName.TREND,
     "Ichimoku": FamilyName.TREND,
     "IchimokuCloud": FamilyName.TREND,
     "Supertrend": FamilyName.TREND,
     "AutoTrend": FamilyName.TREND,
     "RubeGoldberg": FamilyName.TREND,
+    "Parabolic SAR": FamilyName.TREND,
     "DoubleTopBottom": FamilyName.TREND,
     "HeadShoulders": FamilyName.TREND,
     "WedgePattern": FamilyName.TREND,
@@ -87,6 +99,7 @@ _NAME_TO_FAMILY = {
     "CupAndHandle": FamilyName.TREND,
     "PatternDetector": FamilyName.TREND,
     "PatternDetectorCombined": FamilyName.TREND,
+    # Volume (3)
     "OBV": FamilyName.VOLUME,
     "MFI": FamilyName.VOLUME,
     "VWAPIndicator": FamilyName.VOLUME,

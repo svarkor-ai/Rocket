@@ -55,10 +55,10 @@ def ticker_info():
 
 def test_pipeline_all_indicators_count():
     """Verify all expected indicators are registered."""
-    # 20 total: 3 momentum + 9 trend + 2 vol + 3 volume
-    assert len(INDICATORS) == 20
-    # 18 direction: 3 momentum + 9 trend + 3 volume
-    assert len(DIRECTION_INDICATORS) == 18
+    # 29 total: 6 momentum + 14 trend + 3 vol + 3 volume + 3 pattern
+    assert len(INDICATORS) == 29
+    # 26 direction: 6 momentum + 14 trend + 3 volume
+    assert len(DIRECTION_INDICATORS) == 26
 
 
 def test_pipeline_all_indicators_run(up_trend_df, ticker_info):
