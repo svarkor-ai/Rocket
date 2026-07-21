@@ -23,4 +23,9 @@ if __name__ == "__main__":
     register_handlers(application)
 
     logger.info("Stock Scan Pro starting...")
+
+    # Start portfolio scan in a background daemon thread (non-blocking)
+    from rocket.scan_pro.portfolio_scan import start_portfolio_scan
+    start_portfolio_scan()
+
     application.run_polling()

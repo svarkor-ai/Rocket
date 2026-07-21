@@ -84,7 +84,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "• /scanall — show top 10 from last scan (admin only)\n"
         "• /history — view last 5 scans (admin only)\n\n"
         "📋 *Portfolio*\n"
-        "• /list — show all subscriptions\n\n"
+        "• /list — show all subscriptions\n"
+        "• /portfolio — show portfolio with live signals\n\n"
         "👤 *Account*\n"
         "• /plan — view available plans\n"
         "• /userstatus — view your status\n\n"
@@ -208,6 +209,30 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     logger.info(f"User {chat_id} listed subscriptions")
 
 
+async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show current portfolio with live signals for all subscribed tickers."""
+    chat_id = update.effective_user.id
+    store = _get_user_store()
+    tickers = store.list_subscriptions(chat_id)
+    if not tickers:
+        await update.message.reply_text(
+            "No subscriptions yet. Use /subscribe <ticker> to add."
+        )
+        return
+
+    lines = ["\U0001f4cb *Your Portfolio:*"]
+    for t in tickers:
+        state = _get_engine().storage.get_signal_state(t)
+        if state:
+            lines.append(f"\u2022 {t} \u2014 {state.signal.value} (score={state.score:.2f})")
+        else:
+            lines.append(f"\u2022 {t} \u2014 no signal yet")
+    await update.message.reply_text(
+        "\n".join(lines), parse_mode="Markdown"
+    )
+    logger.info(f"User {chat_id} viewed /portfolio")
+
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show detailed status for a ticker."""
     chat_id = update.effective_user.id
@@ -244,7 +269,8 @@ async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Usage: /signal <ticker>")
         return
     ticker = args[0].upper()
-    engine = _get_engine()
+    # Use a more permissive engine for manual scans (show any signal)
+    engine = SignalEngine(_get_engine().storage, config={"min_score": 0.3, "require_change": False})
     await update.message.reply_text(f"🔍 Scanning {ticker}…")
     event = engine.scan_ticker(ticker)
     if event:
@@ -252,9 +278,14 @@ async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         state = engine.storage.get_signal_state(ticker)
         if state:
-            await update.message.reply_text(
-                f"{ticker}: {state.signal.value} (score={state.score:.2f}, no change)"
-            )
+            # Build signal message regardless of whether it was a "change" event
+            emoji = {"BUY": "📈", "SELL": "📉", "HOLD": "➡️"}
+            e = emoji.get(state.signal.value, "📊")
+            lines = [
+                f"{e} *{ticker}* — {state.signal.value}",
+                f"Score: {(state.score + 1.0) / 2.0:.2f}  •  Category: {state.category.value}",
+            ]
+            await context.bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")
         else:
             await update.message.reply_text(f"{ticker}: no signal detected.")
     logger.info(f"User {chat_id} triggered manual scan for {ticker}")
