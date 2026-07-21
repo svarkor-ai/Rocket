@@ -86,13 +86,25 @@ class FamilyWeights:
 
 # Mapping from indicator name to family
 INDICATOR_FAMILY: dict[str, FamilyName] = {
-    # Trend
+    # Momentum (6)
+    "RSI": FamilyName.MOMENTUM,
+    "MACD": FamilyName.MOMENTUM,
+    "ROC": FamilyName.MOMENTUM,
+    "Stochastic": FamilyName.MOMENTUM,
+    "Williams %R": FamilyName.MOMENTUM,
+    "CCI": FamilyName.MOMENTUM,
+    # Trend (14)
     "EMACrossover": FamilyName.TREND,
     "ADX": FamilyName.TREND,
+    "EMA9": FamilyName.TREND,
+    "EMA21": FamilyName.TREND,
+    "EMA50": FamilyName.TREND,
+    "EMA200": FamilyName.TREND,
     "Supertrend": FamilyName.TREND,
     "Ichimoku": FamilyName.TREND,
     "AutoTrend": FamilyName.TREND,
     "RubeGoldberg": FamilyName.TREND,
+    "Parabolic SAR": FamilyName.TREND,
     # Pattern indicators — TREND family
     "DoubleTopBottom": FamilyName.TREND,
     "HeadShoulders": FamilyName.TREND,
@@ -100,11 +112,7 @@ INDICATOR_FAMILY: dict[str, FamilyName] = {
     "AutoFractal": FamilyName.TREND,
     "CupAndHandle": FamilyName.TREND,
     "PatternDetectorCombined": FamilyName.TREND,
-    # Momentum
-    "RSI": FamilyName.MOMENTUM,
-    "MACD": FamilyName.MOMENTUM,
-    "ROC": FamilyName.MOMENTUM,
-    # Volume
+    # Volume (3)
     "OBV": FamilyName.VOLUME,
     "MFI": FamilyName.VOLUME,
     "VWAPIndicator": FamilyName.VOLUME,

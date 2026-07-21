@@ -53,6 +53,55 @@ class BollingerBands(BaseIndicator):
         )
 
 
+# ── Donchian Channel ─────────────────────────────────────────────
+@dataclass
+class DonchianChannel(BaseIndicator):
+    period: int = 20
+
+    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
+        df = self._normalize_columns(df)
+        if len(df) < self.period:
+            return IndicatorResult(
+                name="Donchian Channel", signal=Signal.HOLD, score=0.0,
+                category=SignalCategory.VOLATILITY,
+                values={"upper": 0.0, "middle": 0.0, "lower": 0.0, "price": 0.0},
+            )
+        upper = df['high'].rolling(self.period).max()
+        lower = df['low'].rolling(self.period).min()
+        middle = (upper + lower) / 2
+        price = self._last(df['close'])
+        upper_val = self._last(upper)
+        lower_val = self._last(lower)
+        middle_val = self._last(middle)
+
+        channel_range = upper_val - lower_val
+        if channel_range == 0:
+            return IndicatorResult(
+                name="Donchian Channel", signal=Signal.HOLD, score=0.0,
+                category=SignalCategory.VOLATILITY,
+                values={"upper": upper_val, "middle": middle_val,
+                        "lower": lower_val, "price": price},
+            )
+
+        if price > upper_val:
+            signal = Signal.BUY
+            score = normalize_score(min((price - upper_val) / channel_range, 1.0))
+        elif price < lower_val:
+            signal = Signal.SELL
+            score = normalize_score(max(-(upper_val - price) / channel_range, -1.0))
+        else:
+            signal = Signal.HOLD
+            position = (price - lower_val) / channel_range - 0.5
+            score = normalize_score(position * 2)
+
+        return IndicatorResult(
+            name="Donchian Channel", score=score, signal=signal,
+            category=SignalCategory.VOLATILITY,
+            values={"upper": upper_val, "middle": middle_val,
+                    "lower": lower_val, "price": price},
+        )
+
+
 # ── ATR ─────────────────────────────────────────────────────────
 @dataclass
 class ATR(BaseIndicator):

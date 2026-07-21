@@ -6,6 +6,114 @@ from .base import BaseIndicator, normalize_score
 from .models import IndicatorResult, Signal, SignalCategory
 
 
+# ── EMA9 ─────────────────────────────────────────────────────────
+@dataclass
+class EMA9(BaseIndicator):
+    period: int = 9
+
+    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
+        df = self._normalize_columns(df)
+        if len(df) < self.period:
+            return IndicatorResult(
+                name="EMA9", signal=Signal.HOLD, score=0.0,
+                category=SignalCategory.TREND,
+                values={"ema": 0.0, "price": 0.0},
+            )
+        alpha = 2 / (self.period + 1)
+        ema = df['close'].ewm(span=self.period, adjust=False).mean()
+        price = self._last(df['close'])
+        ema_val = self._last(ema)
+        rel = (price - ema_val) / price if price else 0.0
+        score = normalize_score(min(max(rel * 2, -1.0), 1.0))
+        signal = Signal.BUY if price > ema_val else (Signal.SELL if price < ema_val else Signal.HOLD)
+        return IndicatorResult(
+            name="EMA9", score=score, signal=signal,
+            category=SignalCategory.TREND,
+            values={"ema": ema_val, "price": price},
+        )
+
+
+# ── EMA21 ────────────────────────────────────────────────────────
+@dataclass
+class EMA21(BaseIndicator):
+    period: int = 21
+
+    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
+        df = self._normalize_columns(df)
+        if len(df) < self.period:
+            return IndicatorResult(
+                name="EMA21", signal=Signal.HOLD, score=0.0,
+                category=SignalCategory.TREND,
+                values={"ema": 0.0, "price": 0.0},
+            )
+        alpha = 2 / (self.period + 1)
+        ema = df['close'].ewm(span=self.period, adjust=False).mean()
+        price = self._last(df['close'])
+        ema_val = self._last(ema)
+        rel = (price - ema_val) / price if price else 0.0
+        score = normalize_score(min(max(rel * 2, -1.0), 1.0))
+        signal = Signal.BUY if price > ema_val else (Signal.SELL if price < ema_val else Signal.HOLD)
+        return IndicatorResult(
+            name="EMA21", score=score, signal=signal,
+            category=SignalCategory.TREND,
+            values={"ema": ema_val, "price": price},
+        )
+
+
+# ── EMA50 ────────────────────────────────────────────────────────
+@dataclass
+class EMA50(BaseIndicator):
+    period: int = 50
+
+    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
+        df = self._normalize_columns(df)
+        if len(df) < self.period:
+            return IndicatorResult(
+                name="EMA50", signal=Signal.HOLD, score=0.0,
+                category=SignalCategory.TREND,
+                values={"ema": 0.0, "price": 0.0},
+            )
+        alpha = 2 / (self.period + 1)
+        ema = df['close'].ewm(span=self.period, adjust=False).mean()
+        price = self._last(df['close'])
+        ema_val = self._last(ema)
+        rel = (price - ema_val) / price if price else 0.0
+        score = normalize_score(min(max(rel * 2, -1.0), 1.0))
+        signal = Signal.BUY if price > ema_val else (Signal.SELL if price < ema_val else Signal.HOLD)
+        return IndicatorResult(
+            name="EMA50", score=score, signal=signal,
+            category=SignalCategory.TREND,
+            values={"ema": ema_val, "price": price},
+        )
+
+
+# ── EMA200 ───────────────────────────────────────────────────────
+@dataclass
+class EMA200(BaseIndicator):
+    period: int = 200
+
+    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
+        df = self._normalize_columns(df)
+        if len(df) < self.period:
+            return IndicatorResult(
+                name="EMA200", signal=Signal.HOLD, score=0.0,
+                category=SignalCategory.TREND,
+                values={"ema": 0.0, "price": 0.0},
+            )
+        alpha = 2 / (self.period + 1)
+        ema = df['close'].ewm(span=self.period, adjust=False).mean()
+        price = self._last(df['close'])
+        ema_val = self._last(ema)
+        rel = (price - ema_val) / price if price else 0.0
+        score = normalize_score(min(max(rel * 2, -1.0), 1.0))
+        signal = Signal.BUY if price > ema_val else (Signal.SELL if price < ema_val else Signal.HOLD)
+        return IndicatorResult(
+            name="EMA200", score=score, signal=signal,
+            category=SignalCategory.TREND,
+            values={"ema": ema_val, "price": price},
+        )
+
+
 # ── EMACrossover ────────────────────────────────────────────────
 @dataclass
 class EMACrossover(BaseIndicator):
