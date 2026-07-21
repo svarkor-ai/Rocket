@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from ..technical.models import Signal, SignalCategory
+from ..technical.models import Signal, SignalCategory, SignalStrength
 
 
 @dataclass
@@ -20,6 +20,7 @@ class SignalEvent:
     timeframe: str        # "daily" or "intraday"
     buy_count: int = 0    # number of buy indicators
     sell_count: int = 0   # number of sell indicators
+    strength: SignalStrength = SignalStrength.HOLD
 
 
 @dataclass
@@ -30,3 +31,4 @@ class SignalState:
     score: float
     category: SignalCategory
     updated_at: datetime
+    strength: SignalStrength = SignalStrength.HOLD

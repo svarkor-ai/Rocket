@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from ..technical.models import Signal, SignalCategory
+from ..technical.models import Signal, SignalCategory, SignalStrength
 from ..technical.signal_combiner import SignalSummary
 from ..data.fetcher import fetch_ohlcv
 from ..data.models import TickerInfo, Region
@@ -19,6 +19,44 @@ logger = logging.getLogger(__name__)
 # Thresholds for signal classification
 BUY_THRESHOLD = 10     # minimum buy_count to qualify as BUY
 SELL_THRESHOLD = 10    # minimum sell_count to qualify as SELL
+
+# 5-level strength thresholds
+# Score ranges: [-1.0, +1.0]
+STRENGTH_LEVELS = [
+    (SignalStrength.VERY_BEARISH, -1.0, -0.60),
+    (SignalStrength.BEARISH,       -0.60, -0.20),
+    (SignalStrength.HOLD,           -0.20,  0.20),
+    (SignalStrength.BULLISH,        0.20,  0.60),
+    (SignalStrength.VERY_BULLISH,   0.60,  1.00),
+]
+
+# Hysteresis thresholds per strength transition
+# Each level has: IN (enter), OUT (leave back to previous level)
+HYSTERESIS = {
+    SignalStrength.VERY_BEARISH: {"in": -1.00, "out": -0.50},  # V-Bearish → Bearish
+    SignalStrength.BEARISH:      {"in": -0.60, "out": -0.15},  # Bearish → Hold
+    SignalStrength.HOLD:         {"in": -0.20, "out": +0.20},  # Hold → Bearish/Bullish
+    SignalStrength.BULLISH:      {"in": +0.60, "out": +0.50},  # Bullish → VeryBullish
+    SignalStrength.VERY_BULLISH: {"in": +1.00, "out": +0.55},  # V-Bullish → Bullish
+}
+
+
+def _derive_strength(score: float) -> SignalStrength:
+    """Map score [-1,1] to SignalStrength (5 levels).
+
+    Score ≤ -0.60 → Very Bearish
+    -0.60 < score ≤ -0.20 → Bearish
+    -0.20 < score < +0.20 → Hold
+    +0.20 ≤ score < +0.60 → Bullish
+    Score ≥ +0.60 → Very Bullish
+    """
+    for strength, lo, hi in STRENGTH_LEVELS:
+        if lo <= score <= hi:
+            return strength
+    # Edge cases — should be covered above
+    if score < -1.0:
+        return SignalStrength.VERY_BEARISH
+    return SignalStrength.VERY_BULLISH
 
 
 def _derive_signal(summary: SignalSummary) -> tuple[Signal, SignalCategory]:
@@ -35,13 +73,74 @@ def _derive_signal(summary: SignalSummary) -> tuple[Signal, SignalCategory]:
     return Signal.HOLD, SignalCategory.TREND
 
 
+def _apply_strength_hysteresis(
+    new_strength: SignalStrength,
+    score: float,
+    prev_strength: SignalStrength,
+) -> SignalStrength:
+    """Apply hysteresis to strength transitions.
+
+    Prevents rapid flapping near thresholds.
+    """
+    h = HYSTERESIS
+
+    # Stay in same level unless crossing out threshold
+    if new_strength == prev_strength:
+        out_threshold = h[prev_strength]["out"]
+        # Check if we've drifted below the OUT threshold
+        if prev_strength == SignalStrength.VERY_BEARISH:
+            # Already V-Bearish — stay unless score > -0.50
+            if score > out_threshold:
+                return SignalStrength.BEARISH
+        elif prev_strength == SignalStrength.BEARISH:
+            # Already Bearish — stay unless score > -0.15
+            if score > out_threshold:
+                return SignalStrength.HOLD
+        elif prev_strength == SignalStrength.HOLD:
+            # Already Hold — if score moved into Bearish/Bullish zone, upgrade/downgrade
+            if score <= -0.15:
+                return SignalStrength.BEARISH
+            if score >= +0.15:
+                return SignalStrength.BULLISH
+        elif prev_strength == SignalStrength.BULLISH:
+            # Already Bullish — stay unless score < +0.50
+            if score < out_threshold:
+                return SignalStrength.HOLD
+        elif prev_strength == SignalStrength.VERY_BULLISH:
+            # Already V-Bullish — stay unless score < +0.55
+            if score < out_threshold:
+                return SignalStrength.BULLISH
+    else:
+        # Transitioning — check if we crossed the IN threshold
+        in_threshold = h[new_strength]["in"]
+        if new_strength == SignalStrength.VERY_BEARISH:
+            if score > -0.55:  # didn't cross into V-Bearish zone
+                return SignalStrength.BEARISH
+        elif new_strength == SignalStrength.BEARISH:
+            if score > -0.25:  # didn't cross into Bearish zone
+                return SignalStrength.HOLD
+        elif new_strength == SignalStrength.HOLD:
+            if score <= -0.15:
+                return SignalStrength.BEARISH
+            if score >= +0.15:
+                return SignalStrength.BULLISH
+        elif new_strength == SignalStrength.BULLISH:
+            if score < 0.25:  # didn't cross into Bullish zone
+                return SignalStrength.HOLD
+        elif new_strength == SignalStrength.VERY_BULLISH:
+            if score < +0.55:  # didn't cross into V-Bullish zone
+                return SignalStrength.BULLISH
+
+    return new_strength
+
+
 def _make_reason(summary: SignalSummary, new_sig: Signal, prev_sig: Signal) -> str:
     """Human-readable explanation for the signal event."""
     score = summary.overall_score
     if new_sig == prev_sig:
-        return f"{new_sig.value} (score={score:.1f}, buy={summary.buy_count}, sell={summary.sell_count})"
+        return f"{new_sig.value} (score={score:.2f}, buy={summary.buy_count}, sell={summary.sell_count})"
     return (
-        f"{prev_sig.value} → {new_sig.value} (score={score:.1f}, "
+        f"{prev_sig.value} → {new_sig.value} (score={score:.2f}, "
         f"buy={summary.buy_count}, sell={summary.sell_count})"
     )
 
@@ -58,9 +157,10 @@ class SignalEngine:
             cooldown_minutes (int): min time between same-ticker events
         """
         self.storage = storage
-        self.min_score = float(config.get("min_score", 0.5))
         self.require_change = bool(config.get("require_change", True))
         self.cooldown_minutes = int(config.get("cooldown_minutes", 5))
+        # min_score is configured in [0,1] — convert to [-1,+1]
+        self.min_score = 2.0 * float(config.get("min_score", 0.5)) - 1.0
         # Region key lookup (universe keys are lowercase: 'usa', 'sweden'…)
         self._region_key = str(config.get("region", "usa")).lower()
         # Region enum for TickerInfo (enum values: 'us', 'smid', 'eu', 'asia')
@@ -85,26 +185,18 @@ class SignalEngine:
             logger.warning(f"{ticker}: no OHLCV data")
             return None
 
-        # 2. Get TickerInfo — try universe first, fall back to mock
+        # 2. Get TickerInfo
         universe = get_universe(self._region_key)
         ticker_upper = ticker.upper()
         if ticker_upper in universe:
             ticker_info = TickerInfo(
-                ticker=ticker,
-                name=ticker,
-                region=Region(self._region_enum),
-                sector="",
-                market_cap=0.0,
-                avg_volume=0.0,
+                ticker=ticker, name=ticker, region=Region(self._region_enum),
+                sector="", market_cap=0.0, avg_volume=0.0,
             )
         else:
             ticker_info = TickerInfo(
-                ticker=ticker,
-                name=ticker,
-                region=Region(self._region_enum),
-                sector="",
-                market_cap=0.0,
-                avg_volume=0.0,
+                ticker=ticker, name=ticker, region=Region(self._region_enum),
+                sector="", market_cap=0.0, avg_volume=0.0,
             )
 
         # 3. Compute rocket score
@@ -114,80 +206,67 @@ class SignalEngine:
         # 4. Derive signal from SignalSummary
         summary = result["signal_summary"]
         new_signal, category = _derive_signal(summary)
-        score = float(summary.overall_score)  # [-1, 1] range from weight_scores
+        score = float(summary.overall_score)  # [-1, 1]
 
-        # 4.5. Hysteresis — prevents signal flapping near thresholds
-        #     BUY IN: score > +0.60  (HOLD→BUY threshold)
-        #     BUY OUT: score < +0.35 (BUY→HOLD threshold)
-        #     SELL IN: score < -0.60 (HOLD→SELL threshold)
-        #     SELL OUT: score > -0.35 (SELL→HOLD threshold)
-        buy_in = 0.60
-        buy_out = 0.35
-        sell_in = -0.60
-        sell_out = -0.35
+        # 4.5. Derive strength (5 levels)
+        new_strength = _derive_strength(score)
+
+        # 4.6. Hysteresis on strength — prevents flapping
         prev_state_raw = self.storage.get_signal_state(ticker)
+        prev_strength = prev_state_raw.strength if prev_state_raw else SignalStrength.HOLD
+        final_strength = _apply_strength_hysteresis(new_strength, score, prev_strength)
+
+        # 5. Apply BUY/SELL hysteresis on score in [-1, +1]
+        buy_in = 0.60    # score threshold to enter BUY
+        buy_out = 0.35   # score threshold to exit BUY
+        sell_in = -0.60  # score threshold to enter SELL
+        sell_out = -0.35 # score threshold to exit SELL
         prev_sig_for_hysteresis = prev_state_raw.signal if prev_state_raw else Signal.HOLD
 
-        # Override _derive_signal signal with hysteresis logic:
+        # Apply BUY/SELL hysteresis (keeps internal Signal logic stable)
         if prev_sig_for_hysteresis == Signal.BUY:
-            # Already in BUY — stay BUY until score drops below buy_out
             if score < buy_out:
                 new_signal = Signal.HOLD
                 category = SignalCategory.TREND
         elif prev_sig_for_hysteresis == Signal.SELL:
-            # Already in SELL — stay SELL until score rises above sell_out
             if score > sell_out:
                 new_signal = Signal.HOLD
                 category = SignalCategory.TREND
-        else:  # prev was HOLD — only enter BUY/SELL when crossing strong thresholds
-            if new_signal == Signal.BUY and score > buy_in:
-                pass  # stay BUY, crossed buy_in
-            elif new_signal == Signal.BUY and score <= buy_in:
-                # _derive says BUY but score hasn't crossed buy_in — stay HOLD
+        else:
+            if new_signal == Signal.BUY and score <= buy_in:
                 new_signal = Signal.HOLD
                 category = SignalCategory.TREND
-            if new_signal == Signal.SELL and score < sell_in:
-                pass  # stay SELL, crossed sell_in
-            elif new_signal == Signal.SELL and score >= sell_in:
-                # _derive says SELL but score hasn't crossed sell_in — stay HOLD
+            if new_signal == Signal.SELL and score >= sell_in:
                 new_signal = Signal.HOLD
                 category = SignalCategory.TREND
-        # HOLD stays HOLD unless crossed into BUY/SELL hysteresis zone
 
-        # 5. Check min_score threshold (convert [-1,1] → [0,1])
-        normalized_score = (score + 1.0) / 2.0
-        # min_score applies to BUY signals (high positive score).
-        # SELL signals (negative score) pass through regardless of min_score.
-        if new_signal == Signal.BUY and normalized_score < self.min_score:
-            # Save state so subsequent scans have a baseline, but don't emit event
+        # Min score gate — only emit for notable signals
+        if new_signal == Signal.BUY and score < self.min_score:
             prev_state = self.storage.get_signal_state(ticker)
             if prev_state is None:
                 state = SignalState(
-                    ticker=ticker, signal=new_signal,
-                    score=score, category=category, updated_at=datetime.now(timezone.utc),
+                    ticker=ticker, signal=new_signal, score=score, category=category,
+                    updated_at=datetime.now(timezone.utc), strength=final_strength,
                 )
                 self.storage.save_signal_state(state)
             return None
-        # For SELL signals: require a minimum magnitude (don't emit weak SELL)
         if new_signal == Signal.SELL and abs(score) < self.min_score:
             prev_state = self.storage.get_signal_state(ticker)
             if prev_state is None:
                 state = SignalState(
-                    ticker=ticker, signal=new_signal,
-                    score=score, category=category, updated_at=datetime.now(timezone.utc),
+                    ticker=ticker, signal=new_signal, score=score, category=category,
+                    updated_at=datetime.now(timezone.utc), strength=final_strength,
                 )
                 self.storage.save_signal_state(state)
             return None
 
-        # 6. Load previous state
+        # 6. Check require_change on signal
         prev_state = self.storage.get_signal_state(ticker)
         prev_signal = prev_state.signal if prev_state else Signal.HOLD
-
-        # 7. Check require_change — only skip if we've seen this ticker before
         if prev_state and self.require_change and new_signal == prev_signal:
             return None
 
-        # 8. Check cooldown
+        # 7. Check cooldown
         if prev_state:
             elapsed = datetime.now(timezone.utc) - prev_state.updated_at
             if elapsed < timedelta(minutes=self.cooldown_minutes):
@@ -197,30 +276,24 @@ class SignalEngine:
                 )
                 return None
 
-        # 9. Create event and persist state
+        # 8. Create event and persist state
         now = datetime.now(timezone.utc)
         reason = _make_reason(summary, new_signal, prev_signal)
 
         state = SignalState(
-            ticker=ticker,
-            signal=new_signal,
-            score=score,
-            category=category,
-            updated_at=now,
+            ticker=ticker, signal=new_signal, score=score, category=category,
+            updated_at=now, strength=final_strength,
         )
         self.storage.save_signal_state(state)
 
         event = SignalEvent(
-            ticker=ticker,
-            prev_signal=prev_signal,
-            new_signal=new_signal,
-            score=normalized_score,
-            category=category,
-            reason=reason,
-            timestamp=now,
-            timeframe=timeframe,
+            ticker=ticker, prev_signal=prev_signal, new_signal=new_signal,
+            score=score, category=category, reason=reason,
+            timestamp=now, timeframe=timeframe,
+            buy_count=summary.buy_count, sell_count=summary.sell_count,
+            strength=final_strength,
         )
-        logger.info(f"{ticker}: {reason}")
+        logger.info(f"{ticker}: {reason} (strength={final_strength.value})")
         return event
 
     # -- bulk scan ------------------------------------------------------------
