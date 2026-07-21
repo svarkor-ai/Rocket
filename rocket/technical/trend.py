@@ -1,77 +1,9 @@
-"""Trend indicators — EMA, ADX, EMA crossover."""
+"""Trend indicators — EMA crossover, ADX."""
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from .base import BaseIndicator, normalize_score
 from .models import IndicatorResult, Signal, SignalCategory
-
-
-# ── EMAs ─────────────────────────────────────────────────────────
-@dataclass
-class EMA9(BaseIndicator):
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        ema = df['close'].ewm(span=9, adjust=False).mean()
-        ema_val = self._last(ema)
-        close = self._last(df['close'])
-        score = normalize_score((close - ema_val) / (close + np.finfo(float).eps))
-        return IndicatorResult(
-            name="EMA9", score=score,
-            signal=Signal.BUY if close > ema_val else Signal.SELL,
-            category=SignalCategory.TREND,
-            values={"ema": ema_val, "price": close}
-        )
-
-
-@dataclass
-class EMA21(BaseIndicator):
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        ema = df['close'].ewm(span=21, adjust=False).mean()
-        ema_val = self._last(ema)
-        close = self._last(df['close'])
-        score = normalize_score((close - ema_val) / (close + np.finfo(float).eps))
-        return IndicatorResult(
-            name="EMA21", score=score,
-            signal=Signal.BUY if close > ema_val else Signal.SELL,
-            category=SignalCategory.TREND,
-            values={"ema": ema_val, "price": close}
-        )
-
-
-@dataclass
-class EMA50(BaseIndicator):
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        ema = df['close'].ewm(span=50, adjust=False).mean()
-        ema_val = self._last(ema)
-        close = self._last(df['close'])
-        score = normalize_score((close - ema_val) / (close + np.finfo(float).eps))
-        return IndicatorResult(
-            name="EMA50", score=score,
-            signal=Signal.BUY if close > ema_val else Signal.SELL,
-            category=SignalCategory.TREND,
-            values={"ema": ema_val, "price": close}
-        )
-
-
-@dataclass
-class EMA200(BaseIndicator):
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        ema = df['close'].ewm(span=200, adjust=False).mean()
-        ema_val = self._last(ema)
-        close = self._last(df['close'])
-        if ema_val == 0:
-            return IndicatorResult(name="EMA200", score=0, signal=Signal.HOLD,
-                                   category=SignalCategory.TREND, values={"ema": 0, "price": close})
-        score = normalize_score((close - ema_val) / (close + np.finfo(float).eps))
-        return IndicatorResult(
-            name="EMA200", score=score,
-            signal=Signal.BUY if close > ema_val else Signal.SELL,
-            category=SignalCategory.TREND,
-            values={"ema": ema_val, "price": close}
-        )
 
 
 # ── EMACrossover ────────────────────────────────────────────────

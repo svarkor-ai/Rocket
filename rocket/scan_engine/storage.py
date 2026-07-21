@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .models import SignalState
-from ..technical.models import Signal, SignalCategory
+from ..technical.models import Signal, SignalCategory, SignalStrength
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS signal_states (
@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS signal_states (
     signal      TEXT    NOT NULL,
     score       REAL    NOT NULL,
     category    TEXT    NOT NULL,
-    updated_at  TEXT    NOT NULL
+    updated_at  TEXT    NOT NULL,
+    strength    TEXT    NOT NULL DEFAULT 'Hold'
 );
 
 CREATE TABLE IF NOT EXISTS scan_history (
@@ -26,7 +27,8 @@ CREATE TABLE IF NOT EXISTS scan_history (
     category    TEXT    NOT NULL,
     buy_count   INTEGER NOT NULL DEFAULT 0,
     sell_count  INTEGER NOT NULL DEFAULT 0,
-    reason      TEXT
+    reason      TEXT,
+    strength    TEXT    NOT NULL DEFAULT 'Hold'
 );
 """
 
@@ -45,13 +47,14 @@ class SignalStorage:
         """Upsert the latest signal for *ticker*."""
         self._conn.execute(
             """
-            INSERT INTO signal_states (ticker, signal, score, category, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO signal_states (ticker, signal, score, category, updated_at, strength)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(ticker) DO UPDATE SET
                 signal      = excluded.signal,
                 score       = excluded.score,
                 category    = excluded.category,
-                updated_at  = excluded.updated_at
+                updated_at  = excluded.updated_at,
+                strength    = excluded.strength
             """,
             (
                 state.ticker,
@@ -59,6 +62,7 @@ class SignalStorage:
                 state.score,
                 state.category.value,
                 state.updated_at.isoformat(),
+                state.strength.value,
             ),
         )
         self._conn.commit()
@@ -116,7 +120,7 @@ class SignalStorage:
     def get_signal_state(self, ticker: str) -> Optional[SignalState]:
         """Return the current state for *ticker*, or None."""
         row = self._conn.execute(
-            "SELECT ticker, signal, score, category, updated_at FROM signal_states WHERE ticker = ?",
+            "SELECT ticker, signal, score, category, updated_at, strength FROM signal_states WHERE ticker = ?",
             (ticker,),
         ).fetchone()
         if row is None:
@@ -127,18 +131,20 @@ class SignalStorage:
             score=float(row[2]),
             category=SignalCategory(row[3]),
             updated_at=datetime.fromisoformat(row[4]),
+            strength=SignalStrength(row[5]),
         )
 
     def get_all_states(self) -> list[SignalState]:
         """Return every tracked ticker state."""
         rows = self._conn.execute(
-            "SELECT ticker, signal, score, category, updated_at FROM signal_states ORDER BY ticker"
+            "SELECT ticker, signal, score, category, updated_at, strength FROM signal_states ORDER BY ticker"
         ).fetchall()
         return [
             SignalState(
                 ticker=r[0], signal=Signal(r[1]), score=float(r[2]),
                 category=SignalCategory(r[3]),
                 updated_at=datetime.fromisoformat(r[4]),
+                strength=SignalStrength(r[5]),
             )
             for r in rows
         ]

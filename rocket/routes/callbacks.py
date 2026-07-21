@@ -13,11 +13,11 @@ from rocket.data.models import TickerInfo, Region
 from rocket.scoring.rocket_score import compute_rocket_score
 from rocket.scoring.ranking import rank_regions, top_overall
 from rocket.scoring.models import RocketScore
-from rocket.technical.momentum import RSI, MACD, Stochastic, WilliamsR, ROC, CCI
-from rocket.technical.trend import EMA9, EMA21, EMA50, EMA200, EMACrossover, ADX
-from rocket.technical.volatility import BollingerBands, ATR, DonchianChannel
+from rocket.technical.momentum import RSI, MACD, ROC
+from rocket.technical.trend import EMACrossover, ADX
+from rocket.technical.volatility import BollingerBands, ATR
 from rocket.technical.volume import OBV, MFI, VWAPIndicator
-from rocket.technical.advanced import IchimokuCloud, Supertrend, ParabolicSAR
+from rocket.technical.advanced import IchimokuCloud, Supertrend
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,11 @@ _computed_cache: dict = {}
 def _build_indicator_results(df: pd.DataFrame) -> list:
     """Run all indicators on OHLCV data, return list of IndicatorResults."""
     indicators = [
-        RSI(), MACD(), Stochastic(), WilliamsR(), ROC(), CCI(),
-        EMA9(), EMA21(), EMA50(), EMA200(), EMACrossover(), ADX(),
-        BollingerBands(), ATR(), DonchianChannel(),
+        RSI(), MACD(), ROC(),
+        EMACrossover(), ADX(),
+        BollingerBands(), ATR(),
         OBV(), MFI(), VWAPIndicator(),
-        IchimokuCloud(), Supertrend(), ParabolicSAR(),
+        IchimokuCloud(), Supertrend(),
     ]
     results = []
     for ind in indicators:

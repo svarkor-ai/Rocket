@@ -1,4 +1,4 @@
-"""Volatility indicators — Bollinger Bands, ATR, Donchian Channels."""
+"""Volatility indicators — ATR, Bollinger Bands."""
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -82,42 +82,4 @@ class ATR(BaseIndicator):
         )
 
 
-# ── Donchian Channels ───────────────────────────────────────────
-@dataclass
-class DonchianChannel(BaseIndicator):
-    period: int = 20
 
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        upper = df['high'].rolling(self.period).max()
-        lower = df['low'].rolling(self.period).min()
-        midpoint = (upper + lower) / 2
-
-        close = self._last(df['close'])
-        upper_val = self._last(upper)
-        lower_val = self._last(lower)
-
-        if upper_val == lower_val:
-            return IndicatorResult(
-                name="Donchian", score=0, signal=Signal.HOLD,
-                category=SignalCategory.VOLATILITY,
-                values={"upper": upper_val, "lower": lower_val}
-            )
-
-        position = (close - lower_val) / (upper_val - lower_val)
-
-        if close >= upper_val:
-            score = normalize_score(1.0)
-            signal = Signal.BUY
-        elif close <= lower_val:
-            score = normalize_score(-1.0)
-            signal = Signal.SELL
-        else:
-            score = normalize_score(2 * position - 1)
-            signal = Signal.HOLD
-
-        return IndicatorResult(
-            name="Donchian", score=score, signal=signal,
-            category=SignalCategory.VOLATILITY,
-            values={"upper": upper_val, "lower": lower_val, "position": position}
-        )

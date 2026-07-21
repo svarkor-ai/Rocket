@@ -1,4 +1,4 @@
-"""Advanced indicators — Ichimoku Cloud, Supertrend, Parabolic SAR."""
+"""Advanced indicators — Ichimoku Cloud, Supertrend."""
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -101,65 +101,3 @@ class Supertrend(BaseIndicator):
         )
 
 
-# ── Parabolic SAR ───────────────────────────────────────────────
-@dataclass
-class ParabolicSAR(BaseIndicator):
-    af_start: float = 0.02
-    af_step: float = 0.02
-    af_max: float = 0.2
-
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        close = df['close'].values
-        high = df['high'].values
-        low = df['low'].values
-
-        if len(close) < 20:
-            return IndicatorResult(name="Parabolic SAR", score=0,
-                                   signal=Signal.HOLD, category=SignalCategory.TREND)
-
-        # Simplified Parabolic SAR — run from start
-        sar = low[0]
-        ep = high[0]
-        af = self.af_start
-        trend_up = True
-        lowest = low[0]
-        highest = high[0]
-
-        for i in range(1, len(close)):
-            if trend_up:
-                sar = sar + af * (ep - sar)
-                if close[i] > ep:
-                    ep = close[i]
-                    af = min(af + self.af_step, self.af_max)
-                if low[i] < sar:
-                    trend_up = False
-                    sar = ep
-                    ep = low[i]
-                    af = self.af_start
-            else:
-                sar = sar - af * (sar - ep)
-                if close[i] < ep:
-                    ep = close[i]
-                    af = min(af + self.af_step, self.af_max)
-                if high[i] > sar:
-                    trend_up = True
-                    sar = ep
-                    ep = high[i]
-                    af = self.af_start
-
-        sar_val = sar
-        close_val = close[-1]
-
-        if trend_up and close_val > sar_val:
-            score = normalize_score(min((close_val - sar_val) / close_val, 1.0))
-            signal = Signal.BUY
-        else:
-            score = normalize_score(max(-(sar_val - close_val) / close_val, -1.0))
-            signal = Signal.SELL
-
-        return IndicatorResult(
-            name="Parabolic SAR", score=score, signal=signal,
-            category=SignalCategory.TREND,
-            values={"sar": sar_val, "price": close_val, "trend_up": trend_up}
-        )

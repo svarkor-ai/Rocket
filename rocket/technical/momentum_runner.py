@@ -1,16 +1,14 @@
 """Run all momentum indicators on a DataFrame."""
 
-from .models import IndicatorResult
-from .momentum import (RSI, MACD, Stochastic, WilliamsR, ROC, CCI)
+"""Quick momentum runner — returns list of dict scores for a single ticker."""
+from ..technical.momentum import RSI, MACD, ROC
+from ..technical.models import IndicatorResult
 
-# Map of indicator names → class instances
+INDICATORS = [RSI(), MACD(), ROC()]
 _MOMENTUM_INDICATORS = [
     ('RSI', RSI()),
     ('MACD', MACD()),
-    ('Stochastic', Stochastic()),
-    ('WilliamsR', WilliamsR()),
     ('ROC', ROC()),
-    ('CCI', CCI()),
 ]
 
 

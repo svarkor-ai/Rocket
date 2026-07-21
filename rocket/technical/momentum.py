@@ -1,4 +1,4 @@
-"""Momentum indicators — RSI, MACD, Stochastic, Williams %R, ROC, CCI."""
+"""Momentum indicators — RSI, MACD, ROC."""
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -73,67 +73,6 @@ class MACD(BaseIndicator):
         )
 
 
-# ── Stochastic ───────────────────────────────────────────────────
-@dataclass
-class Stochastic(BaseIndicator):
-    k_period: int = 14
-    d_period: int = 3
-
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        low_min = df['low'].rolling(self.k_period).min()
-        high_max = df['high'].rolling(self.k_period).max()
-        k = 100 * (df['close'] - low_min) / (high_max - low_min + np.finfo(float).eps)
-        d = k.rolling(self.d_period).mean()
-
-        k_v = self._last(k)
-        d_v = self._last(d)
-
-        if k_v < 20:
-            signal = Signal.BUY
-            score = normalize_score((20 - k_v) / 20)
-        elif k_v > 80:
-            signal = Signal.SELL
-            score = normalize_score(-(k_v - 80) / 20)
-        else:
-            signal = Signal.HOLD
-            score = normalize_score((k_v - 50) / 50)
-
-        return IndicatorResult(
-            name="Stochastic", score=score, signal=signal,
-            category=SignalCategory.MOMENTUM,
-            values={"k": k_v, "d": d_v}
-        )
-
-
-# ── Williams %R ──────────────────────────────────────────────────
-@dataclass
-class WilliamsR(BaseIndicator):
-    period: int = 14
-
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        high_max = df['high'].rolling(self.period).max()
-        low_min = df['low'].rolling(self.period).min()
-        wr = -100 * (high_max - df['close']) / (high_max - low_min + np.finfo(float).eps)
-
-        wr_v = self._last(wr)
-        # Williams %R ranges from 0 to -100
-        if wr_v > -20:
-            signal = Signal.SELL
-            score = normalize_score(-(wr_v + 20) / 80)
-        elif wr_v < -80:
-            signal = Signal.BUY
-            score = normalize_score((-80 - wr_v) / 80)
-        else:
-            signal = Signal.HOLD
-            score = normalize_score(-(wr_v + 50) / 100)
-
-        return IndicatorResult(
-            name="Williams %R", score=score, signal=signal,
-            category=SignalCategory.MOMENTUM,
-            values={"wr": wr_v}
-        )
 
 
 # ── ROC ──────────────────────────────────────────────────────────
@@ -162,33 +101,3 @@ class ROC(BaseIndicator):
             values={"roc": roc_v}
         )
 
-
-# ── CCI ──────────────────────────────────────────────────────────
-@dataclass
-class CCI(BaseIndicator):
-    period: int = 20
-
-    def calculate(self, df: pd.DataFrame) -> IndicatorResult:
-        df = self._normalize_columns(df)
-        tp = (df['high'] + df['low'] + df['close']) / 3
-        ma = tp.rolling(self.period).mean()
-        mad = tp.rolling(self.period).apply(lambda x: np.mean(np.abs(x - x.mean())))
-        cci = (tp - ma) / (0.015 * mad + np.finfo(float).eps)
-
-        cci_v = self._last(cci)
-
-        if cci_v > 100:
-            signal = Signal.SELL  # Overbought
-            score = normalize_score(max(-cci_v / 300, -1.0))  # Negative of positive CCI → negative score
-        elif cci_v < -100:
-            signal = Signal.BUY  # Oversold
-            score = normalize_score(-cci_v / 300)  # Negative of negative CCI → positive score
-        else:
-            signal = Signal.HOLD
-            score = normalize_score(cci_v / 100)
-
-        return IndicatorResult(
-            name="CCI", score=score, signal=signal,
-            category=SignalCategory.MOMENTUM,
-            values={"cci": cci_v}
-        )

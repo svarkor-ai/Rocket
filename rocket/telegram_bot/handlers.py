@@ -53,8 +53,20 @@ async def _send_signal_from_history(
     reason: str | None = None,
 ) -> None:
     """Send a signal notification built from a scan_history row."""
-    emoji = {"BUY": "📈", "SELL": "📉", "HOLD": "➡️"}
-    e = emoji.get(signal, "📊")
+    # Strength emoji based on score in [-1, +1]
+    if score is not None:
+        if score >= 0.60:
+            e = "🟣"   # Very Bullish
+        elif score >= 0.20:
+            e = "🟢"   # Bullish
+        elif score <= -0.60:
+            e = "🔴"   # Very Bearish
+        elif score <= -0.20:
+            e = "🟠"   # Bearish
+        else:
+            e = "⚪"   # Hold
+    else:
+        e = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⚪"}.get(signal, "📊")
     lines = [
         f"{e} *{ticker}* — {signal}",
         f"Score: {score:.2f}  •  Category: {category}",
@@ -200,7 +212,19 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     for t in tickers:
         state = engine.storage.get_signal_state(t)
         if state:
-            lines.append(f"  {t}: {state.signal.value} (score={state.score:.2f})")
+            # Strength emoji
+            s = state.score
+            if s >= 0.60:
+                se = "🟣"
+            elif s >= 0.20:
+                se = "🟢"
+            elif s <= -0.60:
+                se = "🔴"
+            elif s <= -0.20:
+                se = "🟠"
+            else:
+                se = "⚪"
+            lines.append(f"  {se} {t}: {state.signal.value} (score={state.score:.2f})")
         else:
             lines.append(f"  {t}: no signal yet")
     await update.message.reply_text(
@@ -224,7 +248,18 @@ async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     for t in tickers:
         state = _get_engine().storage.get_signal_state(t)
         if state:
-            lines.append(f"\u2022 {t} \u2014 {state.signal.value} (score={state.score:.2f})")
+            s = state.score
+            if s >= 0.60:
+                se = "🟣"
+            elif s >= 0.20:
+                se = "🟢"
+            elif s <= -0.60:
+                se = "🔴"
+            elif s <= -0.20:
+                se = "🟠"
+            else:
+                se = "⚪"
+            lines.append(f"\u2022 {se} {t} \u2014 {state.signal.value} (score={state.score:.2f})")
         else:
             lines.append(f"\u2022 {t} \u2014 no signal yet")
     await update.message.reply_text(
@@ -255,6 +290,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f"📊 *{ticker}*",
         f"Signal: {state.signal.value}",
         f"Score: {state.score:.2f}",
+        f"Strength: {state.strength.value}",
         f"Category: {state.category.value}",
         f"Updated: {state.updated_at.strftime('%Y-%m-%d %H:%M UTC')}",
     ]
@@ -278,14 +314,26 @@ async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         state = engine.storage.get_signal_state(ticker)
         if state:
-            # Build signal message regardless of whether it was a "change" event
-            emoji = {"BUY": "📈", "SELL": "📉", "HOLD": "➡️"}
-            e = emoji.get(state.signal.value, "📊")
-            lines = [
-                f"{e} *{ticker}* — {state.signal.value}",
-                f"Score: {(state.score + 1.0) / 2.0:.2f}  •  Category: {state.category.value}",
-            ]
-            await context.bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")
+             # Strength emoji based on score in [-1, +1]
+             s = state.score
+             if s >= 0.60:
+                 se = "🟣"
+             elif s >= 0.20:
+                 se = "🟢"
+             elif s <= -0.60:
+                 se = "🔴"
+             elif s <= -0.20:
+                 se = "🟠"
+             else:
+                 se = "⚪"
+             strength_str = getattr(state, 'strength', None)
+             strength_line = f"Strength: {strength_str.value}\n" if strength_str else ""
+             lines = [
+                 f"{se} *{ticker}* — {state.signal.value}",
+                 f"Score: {state.score:.2f}  •  Category: {state.category.value}",
+                 f"{strength_line}",
+             ]
+             await context.bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")
         else:
             await update.message.reply_text(f"{ticker}: no signal detected.")
     logger.info(f"User {chat_id} triggered manual scan for {ticker}")
@@ -303,16 +351,20 @@ async def om_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         "Systemet analyserar pris, trend, momentum, volatilitet och volym\\n"
         "för att bedöma en akties tekniska riktning.\\n\\n"
         "📐 *Score-skala*\\n"
-        "-1.0 = Starkt bearish (sälj)\\n"
-        " 0.0 = Neutral\\n"
-        "+1.0 = Starkt bullish (köp)\\n\\n"
+        "-1.0 = Extremt bullish (köptryck)\\n"
+        " +1.0 = Extremt bearish (säljtryck)\\n\\n"
+        "🔴 *Very Bearish* (-1.00 → -0.60)\\n"
+        "⚫ *Bearish* (-0.60 → -0.20)\\n"
+        "⚪ *Hold* (-0.20 → +0.20)\\n"
+        "🟢 *Bullish* (+0.20 → +0.60)\\n"
+        "🟣 *Very Bullish* (+0.60 → +1.00)\\n\\n"
         "📈 *Momentum* (vikt: 40%)\\n"
         "• RSI — överköpt/översållt från prisrörelse\\n"
         "• MACD — trendmomentum (MACD-linje vs signal-linje)\\n"
         "• Stochastic — %K vs %D korsning\\n"
         "• Williams %R — överköpt/översållt\\n"
         "• ROC — Rate of Change, prisförändringstakt\\n"
-        "• CCI — prisposition relativt medelvärde+std\\n\\n"
+        "• CCI — prisposition relativt mot medelvärde+std\\n\\n"
         "📉 *Trend* (vikt: 30%)\\n"
         "• EMA-struktur — relationen mellan EMA 9, 21, 50 och 200\\n"
         "• EMA Crossover — korsning mellan korta/långa EMAs\\n"
@@ -330,9 +382,9 @@ async def om_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         "• Supertrend — trendföljande indikator\\n"
         "• Parabolic SAR — trendföljande stop/reverse\\n\\n"
         "🎯 *Signaler*\\n"
-        "• BUY  — score > +0.5 (bullish)\\n"
-        "• HOLD — score mellan -0.5 och +0.5\\n"
-        "• SELL — score < -0.5 (bearish)\\n\\n"
+        "• BUY  — majoriteten av indikatorerna är bullish\\n"
+        "• HOLD — blandad signal, ingen tydlig riktning\\n"
+        "• SELL — majoriteten av indikatorerna är bearish\\n\\n"
         "⚠️ Scannerresultatet är en teknisk observation och\\n"
         "ska inte tolkas som en prognos eller garanti för avkastning.\\n\\n"
         "🔄 *Uppdatering*\\n"

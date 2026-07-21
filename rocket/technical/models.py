@@ -16,6 +16,14 @@ class Signal(str, Enum):
     HOLD = "HOLD"
 
 
+class SignalStrength(str, Enum):
+    VERY_BEARISH = "Very Bearish"
+    BEARISH = "Bearish"
+    HOLD = "Hold"
+    BULLISH = "Bullish"
+    VERY_BULLISH = "Very Bullish"
+
+
 @dataclass
 class IndicatorResult:
     """Result from a single technical indicator."""
