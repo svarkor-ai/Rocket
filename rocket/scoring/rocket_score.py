@@ -25,19 +25,27 @@ from ..technical.momentum import RSI, MACD, ROC
 from ..technical.trend import EMACrossover, ADX
 from ..technical.volatility import BollingerBands, ATR
 from ..technical.volume import OBV, MFI, VWAPIndicator
-from ..technical.advanced import IchimokuCloud, Supertrend
+from ..technical.advanced import IchimokuCloud, Supertrend, AutoTrend, RubeGoldberg
+from ..technical.patterns import (
+    DoubleTopBottom, HeadShoulders, WedgePattern,
+    AutoFractal, CupAndHandle, PatternDetectorCombined,
+)
 from .filter import apply_filters
 from .risk import compute_risk, RiskResult
 from .confidence import compute_confidence, ConfidenceResult
 from ..technical.regime import detect_regime, RegimeResult, Regime
 
 
-# All indicator instances
+# All indicator instances (direction + risk)
 INDICATORS = [
     # Momentum (3)
     RSI(), MACD(), ROC(),
-    # Trend (4)
+    # Trend (9)
     EMACrossover(), ADX(), IchimokuCloud(), Supertrend(),
+    AutoTrend(), RubeGoldberg(),
+    DoubleTopBottom(), HeadShoulders(),
+    WedgePattern(), AutoFractal(), CupAndHandle(),
+    PatternDetectorCombined(),
     # Volatility (2) — risk-only, NOT in direction voting
     BollingerBands(), ATR(),
     # Volume (3)
@@ -49,8 +57,12 @@ INDICATORS = [
 DIRECTION_INDICATORS = [
     # Momentum (3)
     RSI(), MACD(), ROC(),
-    # Trend (4)
+    # Trend (9)
     EMACrossover(), ADX(), IchimokuCloud(), Supertrend(),
+    AutoTrend(), RubeGoldberg(),
+    DoubleTopBottom(), HeadShoulders(),
+    WedgePattern(), AutoFractal(), CupAndHandle(),
+    PatternDetectorCombined(),
     # Volume (3)
     OBV(), MFI(), VWAPIndicator(),
 ]
@@ -63,8 +75,18 @@ _NAME_TO_FAMILY = {
     "ROC": FamilyName.MOMENTUM,
     "EMACrossover": FamilyName.TREND,
     "ADX": FamilyName.TREND,
+    "Ichimoku": FamilyName.TREND,
     "IchimokuCloud": FamilyName.TREND,
     "Supertrend": FamilyName.TREND,
+    "AutoTrend": FamilyName.TREND,
+    "RubeGoldberg": FamilyName.TREND,
+    "DoubleTopBottom": FamilyName.TREND,
+    "HeadShoulders": FamilyName.TREND,
+    "WedgePattern": FamilyName.TREND,
+    "AutoFractal": FamilyName.TREND,
+    "CupAndHandle": FamilyName.TREND,
+    "PatternDetector": FamilyName.TREND,
+    "PatternDetectorCombined": FamilyName.TREND,
     "OBV": FamilyName.VOLUME,
     "MFI": FamilyName.VOLUME,
     "VWAPIndicator": FamilyName.VOLUME,
