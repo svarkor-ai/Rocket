@@ -34,10 +34,10 @@ class BollingerBands(BaseIndicator):
         position = (close - lower_val) / (upper_val - lower_val)
 
         if close >= upper_val:
-            score = normalize_score(min((close - upper_val) / (upper_val - lower_val), 1.0))
+            score = normalize_score(-((close - upper_val) / (upper_val - lower_val)))
             signal = Signal.SELL
         elif close <= lower_val:
-            score = normalize_score(max(-((upper_val - close) / (upper_val - lower_val)), -1.0))
+            score = normalize_score(((upper_val - close) / (upper_val - lower_val)))
             signal = Signal.BUY
         else:
             score = normalize_score(position - 0.5)

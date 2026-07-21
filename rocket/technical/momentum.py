@@ -94,7 +94,7 @@ class Stochastic(BaseIndicator):
             score = normalize_score((20 - k_v) / 20)
         elif k_v > 80:
             signal = Signal.SELL
-            score = normalize_score((k_v - 80) / 20)
+            score = normalize_score(-(k_v - 80) / 20)
         else:
             signal = Signal.HOLD
             score = normalize_score((k_v - 50) / 50)
@@ -121,7 +121,7 @@ class WilliamsR(BaseIndicator):
         # Williams %R ranges from 0 to -100
         if wr_v > -20:
             signal = Signal.SELL
-            score = normalize_score((wr_v + 20) / 80)
+            score = normalize_score(-(wr_v + 20) / 80)
         elif wr_v < -80:
             signal = Signal.BUY
             score = normalize_score((-80 - wr_v) / 80)
