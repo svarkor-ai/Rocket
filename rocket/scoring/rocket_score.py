@@ -33,6 +33,7 @@ from ..technical.patterns import (
 from .filter import apply_filters
 from .risk import compute_risk, RiskResult
 from .confidence import compute_confidence, ConfidenceResult
+from .fundamentals_filter import evaluate_fundamentals, FundamentalFilterResult
 from ..technical.regime import detect_regime, RegimeResult, Regime
 
 
@@ -188,6 +189,7 @@ def compute_rocket_score(
     current_price: float = 0.0,
     index_df=None,  # optional: regional index data for regime
     index_name: str = "^GSPC",  # regional index ticker
+    **kwargs,  # optional: fundamental_data, require_fundamentals
 ) -> dict:
     """Run all indicators, compute v2 pipeline scores, return dict."""
     # ─── Step 1: Run ALL indicators (direction + risk) ───
@@ -281,7 +283,38 @@ def compute_rocket_score(
             factors=["no index data"],
         )
 
-    # ─── Step 7: Final score ───
+    # ─── Step 7: Fundamentals (optional) ───
+    fd = kwargs.get('fundamental_data')
+    fund_result: FundamentalFilterResult | None = None
+    if fd is not None:
+        fund_result = evaluate_fundamentals(fd)
+        if not fund_result.is_pass and kwargs.get('require_fundamentals', False):
+            return {
+                "rocket_score": 0.0,
+                "signal_summary": None,
+                "filter_result": None,
+                "rocket_signal": RocketSignal(
+                    final_score=0.0,
+                    direction_score=0.0,
+                    confidence=0.0,
+                    risk_multiplier=1.0,
+                    regime_multiplier=1.0,
+                    signal=SignalStrength.NEUTRAL,
+                    strength="Neutral",
+                    direction="NEUTRAL",
+                    regime="NO_DATA",
+                    reason=f"Rejected: {fund_result.rejection_reason}",
+                ),
+                "direction_result": None,
+                "risk_result": None,
+                "confidence_result": None,
+                "regime_result": None,
+                "fundamental_result": fund_result,
+            }
+    elif fd is not None:
+        pass  # fundamentals available but not required
+
+    # ─── Step 8: Final score ───
     # direction_score: 0.0→1.0, convert to -1.0→+1.0
     direction_signed = 2.0 * direction_result.score - 1.0  # normalize to [-1, 1]
 
@@ -295,7 +328,7 @@ def compute_rocket_score(
     # Clamp to [-1, 1]
     final_score = max(-1.0, min(1.0, final_score))
 
-    # ─── Step 8: Signal strength ───
+    # ─── Step 9: Signal strength ───
     strength, strength_label = _strength_from_score(final_score, confidence.confidence_score)
     direction = "BULLISH" if final_score > 0 else "BEARISH"
 
@@ -304,11 +337,13 @@ def compute_rocket_score(
         f"{fv.family.value}: {fv.vote.value} ({fv.strength:+.2f})"
         for fv in family_votes
     ]
-    reason = (
-        f"{strength_label} ({direction}) | "
-        f"dir={direction_result.score:.2f} conf={confidence.confidence_score:.2f} "
-        f"risk={risk.risk_score:.2f} regime={regime.regime.value}"
-    )
+    reason_parts = [
+        f"{strength_label} ({direction}) | ",
+        f"dir={direction_result.score:.2f} conf={confidence.confidence_score:.2f} ",
+        f"risk={risk.risk_score:.2f} regime={regime.regime.value}",
+    ]
+    if fund_result is not None:
+        reason_parts.append(f" fund={fund_result.quality}({fund_result.score:.2f})")
 
     # Convert family_votes to dicts for serialization
     family_vote_dicts = []
@@ -331,7 +366,7 @@ def compute_rocket_score(
         direction=direction,
         regime=regime.regime.value,
         family_votes=family_vote_dicts,
-        reason=reason,
+        reason="".join(reason_parts),
     )
 
     # Keep old SignalSummary for backward compatibility
@@ -350,4 +385,5 @@ def compute_rocket_score(
         "risk_result": risk,
         "confidence_result": confidence,
         "regime_result": regime,
+        "fundamental_result": fund_result,
     }
