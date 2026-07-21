@@ -124,10 +124,14 @@ def run(regions: list, test: bool = False, test_limit: int = 5):
 
                 state, summary = result
                 now = datetime.now(timezone.utc)
-                reason = (
-                    f"{state.signal.value} (score={state.score:.2f}, "
-                    f"buy={summary.buy_count}, sell={summary.sell_count})"
-                )
+                if state.signal.value == "BUY":
+                    total = summary.buy_count + summary.sell_count + summary.hold_count
+                    reason = f"Strong momentum — {summary.buy_count}/{total} indicators bullish"
+                elif state.signal.value == "SELL":
+                    total = summary.buy_count + summary.sell_count + summary.hold_count
+                    reason = f"Downtrend pressure — {summary.sell_count}/{total} indicators bearish"
+                else:
+                    reason = "Neutral — mixed signals, no clear direction"
                 records.append((
                     now.isoformat(),
                     ticker,
