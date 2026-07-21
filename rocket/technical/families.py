@@ -89,8 +89,17 @@ INDICATOR_FAMILY: dict[str, FamilyName] = {
     # Trend
     "EMACrossover": FamilyName.TREND,
     "ADX": FamilyName.TREND,
-    "IchimokuCloud": FamilyName.TREND,
     "Supertrend": FamilyName.TREND,
+    "Ichimoku": FamilyName.TREND,
+    "AutoTrend": FamilyName.TREND,
+    "RubeGoldberg": FamilyName.TREND,
+    # Pattern indicators — TREND family
+    "DoubleTopBottom": FamilyName.TREND,
+    "HeadShoulders": FamilyName.TREND,
+    "WedgePattern": FamilyName.TREND,
+    "AutoFractal": FamilyName.TREND,
+    "CupAndHandle": FamilyName.TREND,
+    "PatternDetectorCombined": FamilyName.TREND,
     # Momentum
     "RSI": FamilyName.MOMENTUM,
     "MACD": FamilyName.MOMENTUM,
