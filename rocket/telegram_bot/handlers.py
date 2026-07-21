@@ -56,11 +56,11 @@ async def _send_signal_from_history(
     emoji = {"BUY": "📈", "SELL": "📉", "HOLD": "➡️"}
     e = emoji.get(signal, "📊")
     lines = [
-        f"{e} *{ticker}*: {signal} (score={score:.2f})",
-        f"Category: {category}",
+        f"{e} *{ticker}* — {signal}",
+        f"Score: {score:.2f}  •  Category: {category}",
     ]
     if reason:
-        lines.append(f"_{reason}_")
+        lines.append(f"{reason}")
     lines.append(f"🕒 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")
 

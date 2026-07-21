@@ -36,8 +36,8 @@ async def send_subscribed_signal(
     emoji = {"BUY": "📈", "SELL": "📉", "HOLD": "➡️"}
     e = emoji.get(signal.value, "📊")
     msg = (
-        f"{e} *{ticker}*: {signal.value} (score={score:.2f})\n"
-        f"Category: {category.value}\n"
+        f"{e} *{ticker}* — {signal.value}\n"
+        f"Score: {score:.2f}  •  Category: {category.value}\n"
         f"🕒 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
     )
     await bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
