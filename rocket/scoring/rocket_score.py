@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 import numpy as np
 
@@ -35,6 +36,7 @@ from .risk import compute_risk, RiskResult
 from .confidence import compute_confidence, ConfidenceResult
 from .fundamentals_filter import evaluate_fundamentals, FundamentalFilterResult
 from ..technical.regime import detect_regime, RegimeResult, Regime
+from ..social.sentiment import get_social_sentiment, get_social_score
 
 
 # All indicator instances (direction + risk)
@@ -129,6 +131,7 @@ class RocketSignal:
     strength: str
     direction: str  # "BULLISH" or "BEARISH"
     regime: str  # "BULL", "BEAR", "CHOP"
+    social_sentiment_score: float = 0.0  # -1.0 → +1.0 (social sentiment influence)
     family_votes: list[dict] | None = None  # detail per family
     reason: str = ""  # human-readable reason
 
@@ -314,6 +317,25 @@ def compute_rocket_score(
     elif fd is not None:
         pass  # fundamentals available but not required
 
+    # ─── Step 7b: Social Sentiment (optional influence) ───
+    social_score: float = 0.0
+    social_sentiment_data: dict[str, Any] = {}
+    social_enabled = kwargs.get('social_sentiment', True)
+    if social_enabled:
+        try:
+            ticker_symbols = [ticker_info.ticker.split('.')[0] if '.' in ticker_info.ticker else ticker_info.ticker]
+            sentiment_map = get_social_sentiment(ticker_symbols)
+            if ticker_symbols[0] in sentiment_map:
+                ss = sentiment_map[ticker_symbols[0]]
+                social_score = get_social_score(ss)  # -1.0 to +1.0
+                social_sentiment_data = {
+                    'sentiment': ss.overall_sentiment,
+                    'score': ss.sentiment_score,
+                    'mentions': ss.total_mentions,
+                }
+        except Exception:
+            social_score = 0.0  # default neutral if scraping fails
+
     # ─── Step 8: Final score ───
     # direction_score: 0.0→1.0, convert to -1.0→+1.0
     direction_signed = 2.0 * direction_result.score - 1.0  # normalize to [-1, 1]
@@ -324,6 +346,11 @@ def compute_rocket_score(
         * risk.risk_multiplier
         * regime.multiplier
     )
+
+    # Apply social sentiment as a small bias (max ±0.1 influence on final score)
+    if social_score != 0.0:
+        social_bias = social_score * 0.1  # 10% max influence
+        final_score += social_bias
 
     # Clamp to [-1, 1]
     final_score = max(-1.0, min(1.0, final_score))
@@ -344,6 +371,8 @@ def compute_rocket_score(
     ]
     if fund_result is not None:
         reason_parts.append(f" fund={fund_result.quality}({fund_result.score:.2f})")
+    if social_score != 0.0:
+        reason_parts.append(f" social={social_score:+.2f}")
 
     # Convert family_votes to dicts for serialization
     family_vote_dicts = []
@@ -365,6 +394,7 @@ def compute_rocket_score(
         strength=strength_label,
         direction=direction,
         regime=regime.regime.value,
+        social_sentiment_score=round(social_score, 4),
         family_votes=family_vote_dicts,
         reason="".join(reason_parts),
     )
@@ -386,4 +416,5 @@ def compute_rocket_score(
         "confidence_result": confidence,
         "regime_result": regime,
         "fundamental_result": fund_result,
+        "social_sentiment": social_sentiment_data if social_score != 0.0 else None,
     }
