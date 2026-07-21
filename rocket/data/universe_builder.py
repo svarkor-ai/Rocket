@@ -158,10 +158,11 @@ def _load_index_constituents() -> dict[str, list[str]]:
 
 
 # Ticker regex: two strict patterns (no decimals, no pure digit strings):
-# 1. US-style: 1-7 uppercase letters only  → AAPL, GOOGL, RELIANCE, BRK, A, ZYXWVUT
-# 2. Intl-style: 1-8 alphanum + dot + 1-4 uppercase suffix → BMW.DE, 7203.T, 005930.KS, 0700.HK, RELIANCE.NS
-# Rejects: 104.04, 0.01, 12.50 (decimal prices), 10000JPY (no dot), etc.
-_TICKER_RE = re.compile(r"^(?:[A-Z]{1,7}|[A-Z0-9]{1,8}\.[A-Z]{1,4})$")
+# 1. No-dot: [A-Z]+(?:-[A-Z]+)* — e.g. AAPL, GOOGL, RELIANCE, BF, BRK
+# 2. Dot: [A-Z0-9]+(?:-[A-Z0-9]+)*\.[A-Z]{1,4} — e.g. BMW.DE, 7203.T, ERIC-B.ST, INVESTOR-B.ST
+# Rejects: trailing dash, double dash, decimal prices, pure digit strings
+# Note: All ticker text must be uppercased before matching.
+_TICKER_RE = re.compile(r"^[A-Z0-9]+(?:-[A-Z0-9]+)*\.[A-Z]{1,4}$|^[A-Z]+(?:-[A-Z]+)*$")
 
 # Known false positives to filter out
 _FALSE_POSITIVES = frozenset({
@@ -244,8 +245,11 @@ def _extract_tickers_from_wikipedia(page_name: str) -> list[str]:
                 # Collapse whitespace
                 cell_text = re.sub(r"\s+", "", cell_text)
 
-                if _TICKER_RE.match(cell_text) and cell_text not in _FALSE_POSITIVES:
-                    all_tickers.add(cell_text)
+                # Uppercase before regex match (e.g., "Telia" → "TELIA")
+                cell_text_upper = cell_text.upper()
+
+                if _TICKER_RE.match(cell_text_upper) and cell_text_upper not in _FALSE_POSITIVES:
+                    all_tickers.add(cell_text_upper)
 
     return sorted(all_tickers)
 
@@ -294,7 +298,7 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
                 logger.warning(f"    No tickers from {description} ({page_name})")
 
         if region_tickers:
-            if len(region_tickers) < 5:
+            if len(region_tickers) < 20:
                 # Too few tickers from Wikipedia — likely wrong table parsing, skip it
                 # (will be filled by embedded fallback below)
                 logger.info(f"  {region_key}: only {len(region_tickers)} tickers from Wikipedia — skipping (will use embedded fallback)")
@@ -307,8 +311,6 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
     # --- Fill missing/deficient regions with embedded fallback data ---
     fallback = _build_embedded_fallback()
     for region_key in fallback:
-        if region_key == "usa":
-            continue
         if region_key not in universe or len(universe[region_key]) < 5:
             if region_key in universe:
                 del universe[region_key]
