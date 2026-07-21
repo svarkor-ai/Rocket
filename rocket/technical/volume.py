@@ -61,7 +61,7 @@ class MFI(BaseIndicator):
         mfi_val = self._last(mfi)
 
         if mfi_val > 80:
-            score = normalize_score((mfi_val - 80) / 20)
+            score = normalize_score(-(mfi_val - 80) / 20)
             signal = Signal.SELL
         elif mfi_val < 20:
             score = normalize_score((20 - mfi_val) / 20)

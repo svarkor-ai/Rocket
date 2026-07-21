@@ -116,17 +116,75 @@ class SignalEngine:
         new_signal, category = _derive_signal(summary)
         score = float(summary.overall_score)  # [-1, 1] range from weight_scores
 
+        # 4.5. Hysteresis — prevents signal flapping near thresholds
+        #     BUY IN: score > +0.60  (HOLD→BUY threshold)
+        #     BUY OUT: score < +0.35 (BUY→HOLD threshold)
+        #     SELL IN: score < -0.60 (HOLD→SELL threshold)
+        #     SELL OUT: score > -0.35 (SELL→HOLD threshold)
+        buy_in = 0.60
+        buy_out = 0.35
+        sell_in = -0.60
+        sell_out = -0.35
+        prev_state_raw = self.storage.get_signal_state(ticker)
+        prev_sig_for_hysteresis = prev_state_raw.signal if prev_state_raw else Signal.HOLD
+
+        # Override _derive_signal signal with hysteresis logic:
+        if prev_sig_for_hysteresis == Signal.BUY:
+            # Already in BUY — stay BUY until score drops below buy_out
+            if score < buy_out:
+                new_signal = Signal.HOLD
+                category = SignalCategory.TREND
+        elif prev_sig_for_hysteresis == Signal.SELL:
+            # Already in SELL — stay SELL until score rises above sell_out
+            if score > sell_out:
+                new_signal = Signal.HOLD
+                category = SignalCategory.TREND
+        else:  # prev was HOLD — only enter BUY/SELL when crossing strong thresholds
+            if new_signal == Signal.BUY and score > buy_in:
+                pass  # stay BUY, crossed buy_in
+            elif new_signal == Signal.BUY and score <= buy_in:
+                # _derive says BUY but score hasn't crossed buy_in — stay HOLD
+                new_signal = Signal.HOLD
+                category = SignalCategory.TREND
+            if new_signal == Signal.SELL and score < sell_in:
+                pass  # stay SELL, crossed sell_in
+            elif new_signal == Signal.SELL and score >= sell_in:
+                # _derive says SELL but score hasn't crossed sell_in — stay HOLD
+                new_signal = Signal.HOLD
+                category = SignalCategory.TREND
+        # HOLD stays HOLD unless crossed into BUY/SELL hysteresis zone
+
         # 5. Check min_score threshold (convert [-1,1] → [0,1])
         normalized_score = (score + 1.0) / 2.0
-        if normalized_score < self.min_score:
+        # min_score applies to BUY signals (high positive score).
+        # SELL signals (negative score) pass through regardless of min_score.
+        if new_signal == Signal.BUY and normalized_score < self.min_score:
+            # Save state so subsequent scans have a baseline, but don't emit event
+            prev_state = self.storage.get_signal_state(ticker)
+            if prev_state is None:
+                state = SignalState(
+                    ticker=ticker, signal=new_signal,
+                    score=score, category=category, updated_at=datetime.now(timezone.utc),
+                )
+                self.storage.save_signal_state(state)
+            return None
+        # For SELL signals: require a minimum magnitude (don't emit weak SELL)
+        if new_signal == Signal.SELL and abs(score) < self.min_score:
+            prev_state = self.storage.get_signal_state(ticker)
+            if prev_state is None:
+                state = SignalState(
+                    ticker=ticker, signal=new_signal,
+                    score=score, category=category, updated_at=datetime.now(timezone.utc),
+                )
+                self.storage.save_signal_state(state)
             return None
 
         # 6. Load previous state
         prev_state = self.storage.get_signal_state(ticker)
         prev_signal = prev_state.signal if prev_state else Signal.HOLD
 
-        # 7. Check require_change
-        if self.require_change and new_signal == prev_signal:
+        # 7. Check require_change — only skip if we've seen this ticker before
+        if prev_state and self.require_change and new_signal == prev_signal:
             return None
 
         # 8. Check cooldown
