@@ -21,6 +21,7 @@ htmlcov/
 # Data files (local, not tracked)
 data/*.parquet
 data/*.pkl
+data/tickers/
 logs/
 *.db
 *.sqlite
