@@ -186,8 +186,9 @@ def _parse_csv_content(content: str) -> set[str]:
         parts = line.split(",")
         if parts:
             ticker = parts[0].strip().upper()
-            # Valid: 1-5 uppercase letters, optionally followed by .A or .B
-            if ticker and re.match(r"^[A-Z]{1,5}(\.[A-Z]{1,2})?$", ticker):
+            # Valid: 1-5 uppercase letters, optionally followed by .A/.B or /B suffix
+            # e.g., BRK/B, BRK.A, AAPL, MSFT
+            if ticker and re.match(r"^[A-Z0-9/]{1,5}(?:[.][A-Z]{1,2})?$", ticker):
                 tickers.add(ticker)
     return tickers
 
@@ -343,7 +344,7 @@ def _load_index_constituents() -> dict[str, list[str]]:
 # SEC tickers are max 5 chars. International tickers with suffix can be longer (handled by dot pattern).
 # This rejects company names (MICROSOFT=9, APPLE=5, CISCO=5, INTEL=5, TESLA=5).
 # Note: All ticker text must be uppercased before matching.
-_TICKER_RE = re.compile(r"^[A-Z0-9]{1,5}(?:-[A-Z0-9]{1,5})*\.[A-Z]{1,4}$|^[A-Z]{1,5}$")
+_TICKER_RE = re.compile(r"^[A-Z0-9/]{1,5}(?:[-/][A-Z0-9]{1,5})*\.[A-Z]{1,4}$|^[A-Z0-9/]{1,5}$")
 
 # Known false positives to filter out
 _FALSE_POSITIVES = frozenset({
