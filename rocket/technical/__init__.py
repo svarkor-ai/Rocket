@@ -1,10 +1,10 @@
 from .models import IndicatorResult, SignalCategory
 from .base import BaseIndicator
-from .momentum import RSI, MACD, ROC
-from .trend import EMACrossover, ADX
-from .volatility import BollingerBands, ATR
+from .momentum import RSI, MACD, ROC, Stochastic, WilliamsR, CCI
+from .trend import EMACrossover, ADX, EMA9, EMA21, EMA50, EMA200
+from .volatility import BollingerBands, ATR, DonchianChannel
 from .volume import OBV, MFI, VWAPIndicator
-from .advanced import IchimokuCloud, Supertrend, AutoTrend, RubeGoldberg
+from .advanced import IchimokuCloud, Supertrend, AutoTrend, RubeGoldberg, ParabolicSAR
 from .patterns import (
     ZigZagDetector,
     DoubleTopBottom,
