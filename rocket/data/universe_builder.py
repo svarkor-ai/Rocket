@@ -9,6 +9,7 @@ Loads ticker universes from:
 Total target: 15,000+ tickers across global markets.
 """
 
+import csv
 import json
 import logging
 import re
@@ -34,6 +35,39 @@ US_TICKERS_URL = (
     "/main/us_stock_tickers.csv"
 )
 US_TICKERS_CACHE = CACHE_DIR / "us_tickers.csv"
+
+# Local CSV/XLSX ticker sources (verified, structured data)
+# Path: rocket-stock-scanner/data/tickers/
+TICKER_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "tickers"
+LOCAL_TICKER_SOURCES = {
+    # Australia (ASX)
+    "australia": {
+        "file": TICKER_DATA_DIR / "asx_stocks.csv",
+        "type": "csv",
+        "ticker_column": 0,  # First column = "ASX code"
+    },
+    # UK (LSE) — All Equity (includes Shares, Depository Receipts, ETFs, etc.)
+    "uk": {
+        "file": TICKER_DATA_DIR / "lse_stocks.xlsx",
+        "type": "xlsx",
+        "sheet": "1.0 All Equity",
+        "ticker_column": 0,  # TIDM column
+    },
+    # Germany (Frankfurt)
+    "germany": {
+        "file": TICKER_DATA_DIR / "frankfurt_stocks.xlsx",
+        "type": "xlsx",
+        "sheet": "Prime Standard",
+        "ticker_column": "scan",  # Scan all cells for ticker-like patterns
+    },
+    # Other EU — All Equity (includes Shares, Depository Receipts, ETFs, etc.)
+    "other_eu": {
+        "file": TICKER_DATA_DIR / "other_eu_stocks.xlsx",
+        "type": "xlsx",
+        "sheet": "1.0 All Equity",
+        "ticker_column": 0,
+    },
+}
 
 # Wikipedia pages by region: {region_key: [(page_name, description), ...]}
 # page_name is the Wikipedia article slug (with %26 for &, etc.)
@@ -156,6 +190,101 @@ def _parse_csv_content(content: str) -> set[str]:
             if ticker and re.match(r"^[A-Z]{1,5}(\.[A-Z]{1,2})?$", ticker):
                 tickers.add(ticker)
     return tickers
+
+
+def _load_tickers_from_local_source(source: dict) -> list[str]:
+    """Load tickers from a local CSV or XLSX file.
+
+    Args:
+        source: Dict with keys:
+            file: Path to CSV/XLSX file
+            type: "csv" or "xlsx"
+            ticker_column: column index (int) or "scan" for full-cell scan
+            sheet: XLSX sheet name (only for xlsx type)
+
+    Returns:
+        Sorted list of unique valid tickers, or empty list on failure.
+    """
+    filepath = source["file"]
+    source_type = source["type"]
+    ticker_col = source.get("ticker_column", 0)
+
+    if not filepath.exists():
+        logger.warning(f"Local source file not found: {filepath}")
+        return []
+
+    try:
+        if source_type == "csv":
+            return _load_tickers_from_csv_file(filepath, ticker_col)
+        elif source_type == "xlsx":
+            return _load_tickers_from_xlsx_file(filepath, ticker_col, source.get("sheet"))
+        else:
+            logger.warning(f"Unsupported local source type: {source_type}")
+            return []
+    except Exception as e:
+        logger.warning(f"Failed to load tickers from {filepath}: {e}")
+        return []
+
+
+def _load_tickers_from_csv_file(filepath: Path, ticker_col: int) -> list[str]:
+    """Load tickers from a CSV file using the specified column index."""
+    tickers = set()
+    with open(filepath, "r", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        header = next(reader, None)  # Skip header row
+        for row in reader:
+            if ticker_col < len(row):
+                cell = row[ticker_col].strip().upper()
+                if _TICKER_RE.match(cell) and cell not in _FALSE_POSITIVES:
+                    tickers.add(cell)
+    return sorted(tickers)
+
+
+def _load_tickers_from_xlsx_file(filepath: Path, ticker_col, sheet_name: Optional[str] = None) -> list[str]:
+    """Load tickers from an XLSX file.
+
+    If ticker_col is an int, reads from that column index.
+    If ticker_col is "scan", scans ALL cells for ticker-like patterns.
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        logger.warning("openpyxl required for XLSX loading")
+        return []
+
+    tickers = set()
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+
+    if sheet_name and sheet_name in wb.sheetnames:
+        sheets_to_scan = [sheet_name]
+    elif sheet_name:
+        logger.warning(f"Sheet {sheet_name} not found in {filepath}, scanning all sheets")
+        sheets_to_scan = wb.sheetnames
+    else:
+        sheets_to_scan = wb.sheetnames
+
+    for sheet in sheets_to_scan:
+        ws = wb[sheet]
+        if ticker_col != "scan":
+            # Read specific column
+            for row in ws.iter_rows(min_row=2, values_only=True):  # Skip header
+                if ticker_col < len(row) and row[ticker_col]:
+                    cell = str(row[ticker_col]).strip().upper()
+                    if _TICKER_RE.match(cell) and cell not in _FALSE_POSITIVES:
+                        tickers.add(cell)
+        else:
+            # Scan all cells for ticker-like patterns
+            for row in ws.iter_rows(values_only=True):
+                for cell in row:
+                    if cell and isinstance(cell, str):
+                        cell = cell.strip().upper()
+                        if len(cell) > 20:
+                            continue
+                        if _TICKER_RE.match(cell) and cell not in _FALSE_POSITIVES:
+                            tickers.add(cell)
+
+    wb.close()
+    return sorted(tickers)
 
 
 def _is_cache_fresh(cache: dict) -> bool:
@@ -329,7 +458,7 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
             logger.debug("Using cached universe data")
             return cache["tickers"]
 
-    logger.info("Building universe from index constituents (Wikipedia)")
+    logger.info("Building universe from CSV/XLSX sources + Wikipedia fallback")
     universe: dict[str, list[str]] = {}
     constituents_cache: dict[str, list[str]] = {}
 
@@ -343,8 +472,24 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
     else:
         logger.warning("  usa: no tickers from CSV — will fall back to embedded data")
 
-    # --- Per-region scraping ---
+    # --- Load from local CSV/XLSX sources (verified, structured data) ---
+    for region_key, source in LOCAL_TICKER_SOURCES.items():
+        logger.info(f"Fetching {region_key} tickers from local source...")
+        tickers = _load_tickers_from_local_source(source)
+        if tickers:
+            universe[region_key] = tickers
+            constituents_cache[f"{region_key}/local"] = tickers
+            logger.info(f"  {region_key}: {len(tickers)} tickers (from local {source['type']})")
+        else:
+            logger.warning(f"  {region_key}: no tickers from local source — will use Wikipedia/fallback")
+
+    # --- Per-region scraping for remaining regions (Wikipedia fallback) ---
     for region_key, pages in WIKI_PAGES.items():
+        if region_key in universe:
+            # Already loaded from local source — skip Wikipedia for this region
+            logger.info(f"Skipping {region_key} (already loaded from CSV/XLSX)")
+            continue
+
         logger.info(f"Fetching {region_key} index constituents...")
         region_tickers: set[str] = set()
 
@@ -361,8 +506,6 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
 
         if region_tickers:
             if len(region_tickers) < 20:
-                # Too few tickers from Wikipedia — likely wrong table parsing, skip it
-                # (will be filled by embedded fallback below)
                 logger.info(f"  {region_key}: only {len(region_tickers)} tickers from Wikipedia — skipping (will use embedded fallback)")
             else:
                 universe[region_key] = sorted(region_tickers)
