@@ -2,9 +2,8 @@
 Rocket Stock Scanner - Dynamic Universe Builder
 
 Loads ticker universes from:
-1. Major index constituents via Wikipedia (S&P 500, Nasdaq 100, Dow Jones,
-   Russell 1000/2000, FTSE 100/250, DAX, CAC 40, Nikkei 225, KOSPI, etc.)
-2. Small/mid-cap tickers from additional sources
+1. Curated US ticker CSV (7000+ verified NYSE/NASDAQ/AMEX tickers)
+2. Major index constituents via Wikipedia (OMX30, FTSE, DAX, etc.)
 3. Cached for performance
 
 Total target: 15,000+ tickers across global markets.
@@ -28,18 +27,17 @@ CACHE_TTL_HOURS = 24  # Refresh cache every 24h
 # Known index constituents (fetched from Wikipedia and other sources)
 INDEX_CONSTITUENTS_FILE = CACHE_DIR / "index_constituents.json"
 
+# US tickers source: GitHub mirror of browser-vm/us-stock-tickers
+# 7000+ verified US ticker symbols (NYSE, NASDAQ, AMEX)
+US_TICKERS_URL = (
+    "https://raw.githubusercontent.com/browser-vm/us-stock-tickers"
+    "/main/us_stock_tickers.csv"
+)
+US_TICKERS_CACHE = CACHE_DIR / "us_tickers.csv"
+
 # Wikipedia pages by region: {region_key: [(page_name, description), ...]}
 # page_name is the Wikipedia article slug (with %26 for &, etc.)
 WIKI_PAGES = {
-    # USA
-    "usa": [
-        ("List_of_S%26P_500_companies", "S&P 500"),
-        ("Russell_1000_Index", "Russell 1000"),
-        ("Dow_Jones_Industrial_Average", "Dow Jones (DJIA)"),
-        ("NASDAQ", "NASDAQ Composite companies"),
-        ("New_York_Stock_Exchange", "NYSE listed companies"),
-        ("Russell_2000_Index", "Russell 2000"),
-    ],
     # Sweden / Scandinavia
     "sweden": [
         ("OMX_Stockholm_30", "OMX Stockholm 30"),
@@ -107,6 +105,59 @@ WIKI_PAGES = {
 }
 
 
+def _load_us_tickers_from_csv() -> set[str]:
+    """Load verified US ticker symbols from a curated CSV file.
+
+    Source: https://github.com/browser-vm/us-stock-tickers
+    Contains 7000+ verified ticker symbols for NYSE, NASDAQ, and AMEX.
+    This is the ground-truth source for US tickers — no regex guessing.
+
+    Returns sorted list of unique tickers (max 5 chars, optional .A/.B suffix).
+    """
+    # Try cached CSV first
+    if US_TICKERS_CACHE.exists():
+        try:
+            with open(US_TICKERS_CACHE, "r") as f:
+                content = f.read()
+            if content and len(content) > 1000:
+                logger.info(f"Loaded {US_TICKERS_CACHE.name} ({len(content)} chars)")
+                return _parse_csv_content(content)
+        except IOError:
+            pass
+
+    # Download CSV
+    try:
+        import requests
+        resp = requests.get(US_TICKERS_URL, timeout=30)
+        resp.raise_for_status()
+        content = resp.text
+        # Save cache
+        with open(US_TICKERS_CACHE, "w") as f:
+            f.write(content)
+        logger.info(f"Downloaded US tickers CSV ({len(content)} chars)")
+        return _parse_csv_content(content)
+    except Exception as e:
+        logger.warning(f"Failed to load US tickers CSV: {e}")
+        return set()
+
+
+def _parse_csv_content(content: str) -> set[str]:
+    """Parse CSV content into a set of valid US tickers."""
+    tickers = set()
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith("ticker_symbol"):
+            continue
+        # Format: TICKER,Company Name,Exchange
+        parts = line.split(",")
+        if parts:
+            ticker = parts[0].strip().upper()
+            # Valid: 1-5 uppercase letters, optionally followed by .A or .B
+            if ticker and re.match(r"^[A-Z]{1,5}(\.[A-Z]{1,2})?$", ticker):
+                tickers.add(ticker)
+    return tickers
+
+
 def _is_cache_fresh(cache: dict) -> bool:
     """Check if cache is still within TTL."""
     ts = cache.get("timestamp", "")
@@ -158,11 +209,12 @@ def _load_index_constituents() -> dict[str, list[str]]:
 
 
 # Ticker regex: two strict patterns (no decimals, no pure digit strings):
-# 1. No-dot: [A-Z]+(?:-[A-Z]+)* — e.g. AAPL, GOOGL, RELIANCE, BF, BRK
-# 2. Dot: [A-Z0-9]+(?:-[A-Z0-9]+)*\.[A-Z]{1,4} — e.g. BMW.DE, 7203.T, ERIC-B.ST, INVESTOR-B.ST
-# Rejects: trailing dash, double dash, decimal prices, pure digit strings
+# 1. No-dot: [A-Z]{1,5} — e.g. AAPL, GOOGL, RELIANCE, BF
+# 2. Dot: [A-Z0-9]{1,5}(?:-[A-Z0-9]{1,5})*\.[A-Z]{1,4} — e.g. BMW.DE, 7203.T, ERIC-B.ST
+# SEC tickers are max 5 chars. International tickers with suffix can be longer (handled by dot pattern).
+# This rejects company names (MICROSOFT=9, APPLE=5, CISCO=5, INTEL=5, TESLA=5).
 # Note: All ticker text must be uppercased before matching.
-_TICKER_RE = re.compile(r"^[A-Z0-9]+(?:-[A-Z0-9]+)*\.[A-Z]{1,4}$|^[A-Z]+(?:-[A-Z]+)*$")
+_TICKER_RE = re.compile(r"^[A-Z0-9]{1,5}(?:-[A-Z0-9]{1,5})*\.[A-Z]{1,4}$|^[A-Z]{1,5}$")
 
 # Known false positives to filter out
 _FALSE_POSITIVES = frozenset({
@@ -281,6 +333,16 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
     universe: dict[str, list[str]] = {}
     constituents_cache: dict[str, list[str]] = {}
 
+    # --- USA: load from verified CSV (no Wikipedia scraping) ---
+    logger.info("Fetching USA tickers from curated CSV source...")
+    us_tickers = _load_us_tickers_from_csv()
+    if us_tickers:
+        universe["usa"] = sorted(us_tickers)
+        constituents_cache["usa/csv"] = universe["usa"]
+        logger.info(f"  usa: {len(universe['usa'])} tickers (from CSV)")
+    else:
+        logger.warning("  usa: no tickers from CSV — will fall back to embedded data")
+
     # --- Per-region scraping ---
     for region_key, pages in WIKI_PAGES.items():
         logger.info(f"Fetching {region_key} index constituents...")
@@ -317,20 +379,9 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
             universe[region_key] = list(fallback[region_key])
             logger.info(f"  {region_key}: {len(universe[region_key])} tickers (embedded fallback)")
 
-    # Add known small/mid-cap tickers to USA if indices didn't yield enough
-    if len(universe.get("usa", [])) < 2000:
-        logger.warning(
-            f"  USA has only {len(universe.get('usa', []))} tickers from indices, "
-            "adding known small/mid caps"
-        )
-        universe["usa"] = sorted(set(universe.get("usa", set())) | set(_get_known_small_caps()))
-        logger.info(f"  USA: {len(universe['usa'])} tickers (with small caps)")
-
     # --- Backward-compatibility: international = all non-US regions combined ---
     intl = set()
     for region_key in WIKI_PAGES:
-        if region_key == "usa":
-            continue
         intl.update(universe.get(region_key, []))
     universe["international"] = sorted(intl)
     logger.info(f"  International (combined non-US): {len(universe['international'])} tickers")
@@ -342,31 +393,6 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
     total = {k: len(v) for k, v in universe.items()}
     logger.info(f"Universe built: {total}")
     return universe
-
-
-def _get_known_small_caps() -> list[str]:
-    """Return a list of known small/mid-cap US tickers.
-
-    These are publicly traded companies that are not in major indices but
-    are still significant enough to scan for signals.
-    Includes popular stocks (GME, AMC) and high-growth companies.
-    """
-    return [
-        # Popular / meme stocks
-        "GME", "AMC", "BB", "NOK", "WISH", "CLOV", "SPCE", "SNDL",
-        # Mid/small cap US tickers
-        "ABNB", "ANET", "CRWD", "DDOG", "SNOW", "PLTR", "RBLX", "COIN", "HOOD",
-        "RIVN", "LCID", "SOFI", "AFRM", "UPST", "OPEN", "PTON", "MRNA",
-        "ZM", "DOCU", "UBER", "LYFT", "DASH", "BILL", "S",
-        "PATH", "APPF", "TWLO", "MDB", "GTLB", "ESTC", "AI", "NVO", "ALNY",
-        # Additional small caps
-        "CHPT", "ENPH", "SEDG", "RUN", "SPWR", "FSLR", "PLUG", "BE",
-        "CELH", "MELI", "PINS", "SNPS", "CDNS", "ANSS",
-        "FTNT", "DXCM", "VEEV", "ZBRA", "TTWO", "EA", "NTES", "BILI",
-        "DBX", "APPN", "NET", "ZS", "PANW", "OKTA",
-        "RMBS", "RXST", "EXAS", "SGRY", "VEEV", "HUBS", "CRSP", "NTLA",
-        "BEAM", "EDIT", "RGEN", "QURE", "FATE", "BLUE", "SAGE", "RVMD",
-    ]
 
 
 # Public API
