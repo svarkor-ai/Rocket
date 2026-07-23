@@ -3,7 +3,7 @@ Phase 1: yf.download() batch → detect live tickers
 Phase 2: Sequential history() with retry + delay → compute scores
 Phase 3: Save to SQLite + send to Telegram
 """
-import sys, os, time, logging, asyncio, warnings
+import sys, os, time, logging, asyncio, warnings, threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,6 +12,22 @@ warnings.filterwarnings('ignore')
 logging.getLogger('yfinance').setLevel(logging.CRITICAL)
 logging.getLogger('urllib3').setLevel(logging.CRITICAL)
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s %(message)s', force=True)
+
+# Force file logging (works even when stdout is not a tty)
+LOG_FILE = '/tmp/scanall.log'
+_log_fh = open(LOG_FILE, 'a')
+
+def _log(msg, flush=True):
+    _log_fh.write(str(msg) + '\n')
+    if flush:
+        _log_fh.flush()
+
+# Patch print to also write to log file
+_orig_print = print
+def _print(*args, **kwargs):
+    _orig_print(*args, **kwargs)
+    _log(' '.join(str(a) for a in args), flush=kwargs.get('flush', True))
+print = _print
 
 sys.path.insert(0, '/srv/svarkor/builds/rocket-stock-scanner')
 os.chdir('/srv/svarkor/builds/rocket-stock-scanner')
@@ -58,12 +74,31 @@ def is_real_ticker(ticker: str) -> bool:
     return True
 
 
-def fetch_history_with_retry(ticker: str, max_retries: int = 3, base_delay: float = 1.0):
-    """Fetch 3mo history with timeout and exponential backoff."""
-    stock = yf.Ticker(ticker)
+def _fetch_with_thread_timeout(ticker, timeout):
+    """Fetch history with hard timeout using threading."""
+    result = [None]
+    error = [None]
+    def _fetch():
+        try:
+            stock = yf.Ticker(ticker)
+            df = stock.history(period='3mo', interval='1d', timeout=8)
+            result[0] = df
+        except Exception as e:
+            error[0] = e
+    t = threading.Thread(target=_fetch, daemon=True)
+    t.start()
+    t.join(timeout=timeout)
+    if t.is_alive():
+        return None  # timed out
+    if error[0]:
+        raise error[0]
+    return result[0]
+
+def fetch_history_with_retry(ticker, max_retries=3, base_delay=1.0):
+    """Fetch 3mo history with hard thread timeout and backoff."""
     for attempt in range(max_retries):
         try:
-            df = stock.history(period='3mo', interval='1d', timeout=8)
+            df = _fetch_with_thread_timeout(ticker, timeout=12)
             if df is not None and not df.empty:
                 return df
             if attempt < max_retries - 1:
@@ -102,7 +137,17 @@ def scan_single_ticker(region: str, ticker: str):
         info = {}
         try:
             stock = yf.Ticker(ticker)
-            info = stock.info or {}
+            # Hard timeout for info fetch (prevents hanging forever)
+            result = [None]
+            def _fetch_info():
+                try:
+                    result[0] = (stock.info or {})
+                except:
+                    result[0] = {}
+            t = threading.Thread(target=_fetch_info, daemon=True)
+            t.start()
+            t.join(timeout=5)
+            info = result[0] if t.is_alive() else {}
         except Exception:
             info = {}
         
