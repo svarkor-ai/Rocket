@@ -5,7 +5,7 @@ import os
 
 from ..users.store import UserStore
 
-ADMIN_CHAT_ID: int = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
+ADMIN_CHAT_ID: int = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "7228171084"))
 
 
 async def _check_admin(update, context) -> bool:

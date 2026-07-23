@@ -406,7 +406,7 @@ def _run_scan_region(region: str):
 async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin-only: show Top 10 from the latest scan in scan_history (non-blocking)."""
     chat_id = update.effective_user.id
-    admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
+    admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "7228171084"))
     if chat_id != admin_chat_id:
         await update.message.reply_text("🔒 Admin only")
         return
@@ -460,7 +460,7 @@ async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show the last 5 scans with signal counts per scan."""
     chat_id = update.effective_user.id
-    admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
+    admin_chat_id = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "7228171084"))
     if chat_id != admin_chat_id:
         await update.message.reply_text("🔒 Admin only")
         return
