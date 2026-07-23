@@ -414,8 +414,10 @@ async def scanall_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.message.reply_chat_action(action="typing")
 
     async def _get_top_signals():
-        top_10 = _storage_cache.get_top_signals(10)
-        total_row = _storage_cache._conn.execute(
+        # Ensure engine+storage are initialized (also handles concurrent access)
+        storage = _get_engine().storage
+        top_10 = storage.get_top_signals(10)
+        total_row = storage._conn.execute(
             "SELECT COUNT(*) FROM scan_history"
         ).fetchone()
         total = total_row[0] if total_row else 0
