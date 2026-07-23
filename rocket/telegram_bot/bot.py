@@ -30,7 +30,7 @@ from .commands import (
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("SCAN_PRO_TELEGRAM_BOT_TOKEN", "")
-ADMIN_CHAT_ID = os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "")
+ADMIN_CHAT_ID = os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "7228171084")
 
 _user_store: UserStore | None = None
 
