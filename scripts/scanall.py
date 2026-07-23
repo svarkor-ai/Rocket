@@ -58,20 +58,19 @@ def is_real_ticker(ticker: str) -> bool:
     return True
 
 
-def fetch_history_with_retry(ticker: str, max_retries: int = 3, base_delay: float = 2.0):
-    """Fetch 3mo history with exponential backoff retry on rate-limit."""
+def fetch_history_with_retry(ticker: str, max_retries: int = 3, base_delay: float = 1.0):
+    """Fetch 3mo history with timeout and exponential backoff."""
     stock = yf.Ticker(ticker)
     for attempt in range(max_retries):
         try:
-            df = stock.history(period='3mo', interval='1d')
+            df = stock.history(period='3mo', interval='1d', timeout=8)
             if df is not None and not df.empty:
                 return df
             if attempt < max_retries - 1:
                 time.sleep(base_delay * (2 ** attempt))
-        except Exception as e:
+        except Exception:
             if attempt < max_retries - 1:
-                delay = base_delay * (2 ** attempt)
-                time.sleep(delay)
+                time.sleep(base_delay * (2 ** attempt))
     return None
 
 
@@ -105,7 +104,7 @@ def scan_single_ticker(region: str, ticker: str):
             stock = yf.Ticker(ticker)
             info = stock.info or {}
         except Exception:
-            pass
+            info = {}
         
         name = info.get('shortName', '') or info.get('longName', ticker)
         sector = info.get('sector', 'Unknown')
