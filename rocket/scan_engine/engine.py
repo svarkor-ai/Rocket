@@ -17,8 +17,8 @@ from .storage import SignalStorage
 logger = logging.getLogger(__name__)
 
 # Thresholds for signal classification
-BUY_THRESHOLD = 10     # minimum buy_count to qualify as BUY
-SELL_THRESHOLD = 10    # minimum sell_count to qualify as SELL
+BUY_THRESHOLD = 4      # minimum buy_count to qualify as BUY (5 of 7 indicators agree)
+SELL_THRESHOLD = 4     # minimum sell_count to qualify as SELL
 
 # 5-level strength thresholds
 # Score ranges: [-1.0, +1.0]
