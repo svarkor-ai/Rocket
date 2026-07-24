@@ -6,11 +6,15 @@ from ..technical.models import SignalCategory
 from ..technical.signal_combiner import SignalSummary
 
 
-# Weights: momentum 40%, trend 30%, volatility 20%, volume 10%
+# Evidence-based weights (Artemis research 2026-07-24)
+# Momentum 50% — strongest academic backing (Jegadeesh & Titman 1993, Moskowitz et al. 2012)
+# Trend 35% — good evidence but regime-dependent (Chan 2007, Aronson 2011)
+# Volatility 5% — risk-management only, weak directional prediction (Lopez de Prado 2018)
+# Volume 10% — weak evidence for return prediction (Chan 2007)
 WEIGHTS = {
-    SignalCategory.MOMENTUM: 0.40,
-    SignalCategory.TREND: 0.30,
-    SignalCategory.VOLATILITY: 0.20,
+    SignalCategory.MOMENTUM: 0.50,
+    SignalCategory.TREND: 0.35,
+    SignalCategory.VOLATILITY: 0.05,
     SignalCategory.VOLUME: 0.10,
 }
 
