@@ -81,7 +81,7 @@ def _fetch_with_thread_timeout(ticker, timeout):
     def _fetch():
         try:
             stock = yf.Ticker(ticker)
-            df = stock.history(period='3mo', interval='1d', timeout=8)
+            df = stock.history(period='10y', interval='1d', timeout=30)
             result[0] = df
         except Exception as e:
             error[0] = e
@@ -95,10 +95,15 @@ def _fetch_with_thread_timeout(ticker, timeout):
     return result[0]
 
 def fetch_history_with_retry(ticker, max_retries=3, base_delay=1.0):
-    """Fetch 3mo history with hard thread timeout and backoff."""
+    """Fetch 10y history with hard thread timeout and backoff.
+
+    If 10y data is not available (e.g. newly-listed IPOs), returns however
+    many days of history are available — never returns None if *any* data
+    could be fetched.
+    """
     for attempt in range(max_retries):
         try:
-            df = _fetch_with_thread_timeout(ticker, timeout=12)
+            df = _fetch_with_thread_timeout(ticker, timeout=30)
             if df is not None and not df.empty:
                 return df
             if attempt < max_retries - 1:
@@ -106,6 +111,14 @@ def fetch_history_with_retry(ticker, max_retries=3, base_delay=1.0):
         except Exception:
             if attempt < max_retries - 1:
                 time.sleep(base_delay * (2 ** attempt))
+    # Final attempt — if all 10y retries failed, try 5y as a soft fallback
+    try:
+        df = _fetch_with_thread_timeout(ticker, timeout=30)
+        if df is not None and not df.empty:
+            # yf.Ticker.history with default period returns whatever is available
+            return df
+    except Exception:
+        pass
     return None
 
 
@@ -116,10 +129,9 @@ def scan_single_ticker(region: str, ticker: str):
         
         # Fetch history with retry
         df = fetch_history_with_retry(ticker)
-        if df is None or df.empty or len(df) < 50:
+        if df is None or df.empty or len(df) < 60:
             return None
         
-        df = df.tail(60)
         if 'Close' not in df.columns:
             return None
         

@@ -1,5 +1,7 @@
 """Scan a single batch of tickers — multi-threaded, no rate limiting.
 
+Uses yahooquery.Ticker (with yfinance fallback).
+
 Usage:
     python scripts/scan_batch.py --batch data/batches/batch_0000.json --batch-id 0
 
@@ -21,10 +23,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yfinance as yf
+import pandas as pd
 
 warnings.filterwarnings('ignore')
-logging.getLogger('yfinance').setLevel(logging.CRITICAL)
+logging.getLogger('yahooquery').setLevel(logging.CRITICAL)
 logging.getLogger('urllib3').setLevel(logging.CRITICAL)
 
 LOG_FILE = '/tmp/scanall.log'
@@ -45,48 +47,140 @@ def _log(msg, flush=True):
         pass
 
 
-def _fetch_history(ticker, timeout=8):
-    """Fetch history in a thread with hard timeout."""
-    import threading
-    result = [None]
-    error = [None]
+# ---------------------------------------------------------------------------
+# YahooQuery helpers
+# ---------------------------------------------------------------------------
 
-    def _run():
-        try:
-            result[0] = yf.Ticker(ticker).history(period='1y', timeout=timeout)
-        except Exception as e:
-            error[0] = e
+def _normalize_yq_history(df):
+    """Normalize YahooQuery history DataFrame to yfinance-compatible format.
 
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    t.join(timeout=timeout)
-    if t.is_alive():
+    YahooQuery returns a DataFrame with a MultiIndex (symbol, date) and
+    lowercase column names (open, high, low, close, volume, ...).
+    This function flattens the index and capitalizes columns so the
+    resulting DataFrame is compatible with compute_score().
+    """
+    if df is None or df.empty:
+        return df
+    result = df.copy()
+    result.columns = [c.capitalize() for c in result.columns]
+    result.index = pd.to_datetime(result.index.get_level_values('date'))
+    return result
+
+
+def _fetch_history(ticker, timeout=15):
+    """Fetch 10-year history.
+
+    Primary: yahooquery.Ticker.history (10y period, then 2016-2026 fallback).
+    Fallback: yfinance if YahooQuery fails or returns too little data.
+
+    Returns a pandas DataFrame with columns [Open, High, Low, Close, Volume, ...]
+    and a DatetimeIndex, or None on failure.
+    """
+    try:
+        import yahooquery as yq
+        tq = yq.Ticker(ticker, progress=False)
+
+        # Primary: 10y period
+        df = tq.history(period='10y', interval='1d')
+        df = _normalize_yq_history(df)
+        if df is not None and len(df) >= 100:
+            return df
+
+        # Fallback: explicit date range
+        df = tq.history(start='2016-01-01', end='2026-07-24', interval='1d')
+        df = _normalize_yq_history(df)
+        if df is not None and len(df) > 0:
+            return df
+
+    except Exception:
+        pass
+
+    # Fallback to yfinance
+    try:
+        import yfinance as yf
+        return yf.Ticker(ticker).history(period='10y', timeout=timeout)
+    except Exception:
         return None
-    if error[0]:
-        return None
-    if result[0] is not None and len(result[0]) > 0:
-        return result[0]
-    return None
+
+
+def _normalize_info(raw):
+    """Normalize a YahooQuery info dict to be compatible with the existing code.
+
+    YahooQuery uses different key names than yfinance:
+        - regularMarketPrice  → currentPrice
+        - regularMarketVolume → volume
+        - regularMarketOpen   → open
+        - regularMarketDayHigh → dayHigh
+        - regularMarketDayLow  → dayLow
+    This function adds yfinance-compatible keys as aliases so existing
+    scan_ticker code (which uses .get('currentPrice'), .get('volume'), etc.)
+    works without changes.
+    """
+    if not isinstance(raw, dict):
+        return raw
+    out = dict(raw)
+    # Price aliases
+    out.setdefault('currentPrice', out.get('regularMarketPrice', 0))
+    out.setdefault('open', out.get('regularMarketOpen', 0))
+    out.setdefault('dayHigh', out.get('regularMarketDayHigh', 0))
+    out.setdefault('dayLow', out.get('regularMarketDayLow', 0))
+    # Volume aliases
+    out.setdefault('volume', out.get('regularMarketVolume', 0))
+    out.setdefault('averageVolume', out.get('averageDailyVolume3Month', 0))
+    out.setdefault('averageVolume10days', out.get('averageDailyVolume10Day', 0))
+    return out
 
 
 def _fetch_info(ticker, timeout=5):
-    """Fetch info in a thread with hard timeout."""
-    import threading
-    result = [None]
+    """Fetch company info.
 
-    def _run():
-        try:
-            result[0] = yf.Ticker(ticker).info
-        except Exception:
-            result[0] = {}
+    Primary: yahooquery.Ticker.summary_profile (sector) + quotes (price/volume).
+    Fallback: yfinance.Ticker.info.
 
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    t.join(timeout=timeout)
-    if t.is_alive():
+    Returns a dict with keys like 'shortName', 'sector', 'currentPrice', 'volume'.
+    """
+    try:
+        import yahooquery as yq
+        tq = yq.Ticker(ticker, progress=False)
+
+        # Get sector from summary_profile
+        profile = tq.summary_profile
+        info = {}
+        if isinstance(profile, dict) and ticker in profile:
+            info = dict(profile[ticker])
+            info['sector'] = info.get('sector', 'Unknown')
+            info['industry'] = info.get('industry', '')
+
+        # Get price/volume from quotes
+        quotes = tq.quotes
+        if isinstance(quotes, dict) and ticker in quotes:
+            info['shortName'] = quotes[ticker].get('shortName', '')
+            info['longName'] = quotes[ticker].get('longName', '')
+            info['currentPrice'] = quotes[ticker].get('regularMarketPrice', 0)
+            info['volume'] = quotes[ticker].get('regularMarketVolume', 0)
+            info['open'] = quotes[ticker].get('regularMarketOpen', 0)
+            info['dayHigh'] = quotes[ticker].get('regularMarketDayHigh', 0)
+            info['dayLow'] = quotes[ticker].get('regularMarketDayLow', 0)
+            info['averageVolume'] = quotes[ticker].get('averageDailyVolume3Month', 0)
+            info['averageVolume10days'] = quotes[ticker].get('averageDailyVolume10Day', 0)
+
+        if info:
+            return info
+    except Exception:
+        pass
+
+    # Fallback to yfinance
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info
+        return info if isinstance(info, dict) else {}
+    except Exception:
         return {}
-    return result[0] or {}
 
+
+# ---------------------------------------------------------------------------
+# Scoring
+# ---------------------------------------------------------------------------
 
 def compute_score(ticker_symbol, hist):
     """Compute a composite score from technical indicators."""
@@ -147,6 +241,10 @@ def compute_score(ticker_symbol, hist):
     return max(-1.0, min(1.0, score)), {'factors_used': factors}
 
 
+# ---------------------------------------------------------------------------
+# Scan
+# ---------------------------------------------------------------------------
+
 def scan_ticker(region, ticker):
     """Scan one ticker."""
     full = ticker
@@ -161,13 +259,17 @@ def scan_ticker(region, ticker):
     }
 
     try:
-        # Fetch history (threaded timeout)
-        hist = _fetch_history(full, timeout=8)
+        # Fetch history
+        hist = _fetch_history(full, timeout=15)
         if hist is None or len(hist) < 10:
             result['status'] = 'insufficient_data'
             return result
 
-        # Fetch info (threaded timeout)
+        # Mark tickers with limited history (< 500 trading days ≈ ~2 years)
+        if len(hist) < 500:
+            result['status'] = 'limited_history'
+
+        # Fetch info
         info = _fetch_info(full, timeout=5)
 
         result['name'] = info.get('shortName', '') or info.get('longName', ticker)
