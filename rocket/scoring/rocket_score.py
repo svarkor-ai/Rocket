@@ -37,6 +37,7 @@ from .confidence import compute_confidence, ConfidenceResult
 from .fundamentals_filter import evaluate_fundamentals, FundamentalFilterResult
 from ..technical.regime import detect_regime, RegimeResult, Regime
 from ..social.sentiment import get_social_sentiment, get_social_score
+from ..quant.options import compute_options_factor
 
 
 # All indicator instances (direction + risk)
@@ -336,6 +337,31 @@ def compute_rocket_score(
         except Exception:
             social_score = 0.0  # default neutral if scraping fails
 
+    # ─── Step 7c: Options Factor (optional influence) ───
+    options_score: float = 0.0
+    options_data: dict[str, Any] = {}
+    options_enabled = kwargs.get('options_factor', False)
+    if options_enabled and current_price > 0:
+        try:
+            opts = compute_options_factor(
+                ticker=ticker_info.ticker.split('.')[0] if '.' in ticker_info.ticker else ticker_info.ticker,
+                current_price=current_price,
+                social_sentiment_score=social_score,
+            )
+            if opts.is_options_enabled:
+                options_score = opts.bias
+                options_data = {
+                    'max_pain_distance': opts.max_pain_distance,
+                    'put_call_ratio': opts.put_call_ratio,
+                    'dte': opts.dte,
+                    'bias': opts.bias,
+                    'confidence': opts.confidence,
+                    'expiration': opts.details.get('expiration'),
+                    'max_pain_strike': opts.details.get('max_pain_strike'),
+                }
+        except Exception:
+            options_score = 0.0  # default neutral if options fetch fails
+
     # ─── Step 8: Final score ───
     # direction_score: 0.0→1.0, convert to -1.0→+1.0
     direction_signed = 2.0 * direction_result.score - 1.0  # normalize to [-1, 1]
@@ -351,6 +377,12 @@ def compute_rocket_score(
     if social_score != 0.0:
         social_bias = social_score * 0.1  # 10% max influence
         final_score += social_bias
+
+    # Apply options factor as a small bias (max ±0.05 influence on final score)
+    # Options data is less reliable than technical signals
+    if options_score != 0.0:
+        options_bias = options_score * 0.05  # 5% max influence
+        final_score += options_bias
 
     # Clamp to [-1, 1]
     final_score = max(-1.0, min(1.0, final_score))
@@ -373,6 +405,8 @@ def compute_rocket_score(
         reason_parts.append(f" fund={fund_result.quality}({fund_result.score:.2f})")
     if social_score != 0.0:
         reason_parts.append(f" social={social_score:+.2f}")
+    if options_score != 0.0:
+        reason_parts.append(f" opts={options_score:+.2f} mp={options_data.get('max_pain_strike', '?')}")
 
     # Convert family_votes to dicts for serialization
     family_vote_dicts = []
@@ -417,4 +451,5 @@ def compute_rocket_score(
         "regime_result": regime,
         "fundamental_result": fund_result,
         "social_sentiment": social_sentiment_data if social_score != 0.0 else None,
+        "options_data": options_data if options_score != 0.0 else None,
     }

@@ -41,13 +41,14 @@ def compute_meme_score(
     short_interest: float,  # % of float
     current_volume: float,
     avg_volume: float,
+    short_volume_ratio: float = 0.0,
 ) -> MemeSignal:
     """Compute meme stock signal.
 
     Scoring (0-100):
         - Bullish sentiment > 70%: +35 points
         - Short interest > 20%: +25 points
-        - Short ratio > 5: +20 points
+        - Short volume ratio > 5 (proxy for short ratio): +20 points
         - Volume spike > 3x avg: +20 points
 
     Args:
@@ -56,6 +57,7 @@ def compute_meme_score(
         short_interest: Short interest as percentage of float (e.g. 20.0 = 20%).
         current_volume: Current day's trading volume.
         avg_volume: Average daily trading volume.
+        short_volume_ratio: Short volume / total volume ratio.
 
     Returns:
         MemeSignal dataclass with computed metrics.
@@ -79,8 +81,8 @@ def compute_meme_score(
     if short_interest > 20.0:
         score += 25.0
 
-    # Short ratio > 5 (proxy: short_interest_pct > 50%): +20 points
-    if short_interest > 50.0:
+    # Short volume ratio > 5 (proxy for short ratio days-to-cover > 5): +20 points
+    if short_volume_ratio > 5.0:
         score += 20.0
 
     # Volume spike > 3x avg: +20 points
@@ -102,7 +104,7 @@ def compute_meme_score(
         meme_score=round(score, 1),
         sentiment_bull_pct=round(sent_bull, 1),
         short_interest_pct=round(short_interest, 1),
-        short_ratio=round(short_interest / 5.0, 1) if short_interest > 0 else 0.0,
+        short_ratio=round(short_volume_ratio, 1),
         volume_spike=round(volume_spike, 2),
         details=details,
     )
@@ -132,6 +134,7 @@ def meme_score_from_defaults(
         short_interest=0.0,   # no short interest data
         current_volume=current_volume,
         avg_volume=avg_volume,
+        short_volume_ratio=0.0,
     )
 
 
@@ -165,8 +168,10 @@ def meme_score_from_stocktwits(
         si_map = _get_si([ticker])
         si_obj = si_map.get(ticker)
         short_pct = si_obj.short_percent_of_float if si_obj else 0.0
+        svi = si_obj.short_volume_ratio if si_obj else 0.0
     except Exception:
         short_pct = 0.0
+        svi = 0.0
 
     return compute_meme_score(
         ticker=ticker,
@@ -174,4 +179,5 @@ def meme_score_from_stocktwits(
         short_interest=short_pct,
         current_volume=current_volume,
         avg_volume=avg_volume,
+        short_volume_ratio=svi,
     )

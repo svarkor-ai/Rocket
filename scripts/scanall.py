@@ -122,8 +122,8 @@ def fetch_history_with_retry(ticker, max_retries=3, base_delay=1.0):
     return None
 
 
-def scan_single_ticker(region: str, ticker: str):
-    """Scan one live ticker. Returns (ticker, signal, score, regime, buy_count, sell_count, reason) or None."""
+def scan_single_ticker(region: str, ticker: str, enable_options: bool = False):
+    """Scan one live ticker. Returns (ticker, signal, score, regime, buy_count, sell_count, reason, options_data) or None."""
     try:
         region_enum = REGION_MAP.get(region, Region.US)
         
@@ -173,7 +173,7 @@ def scan_single_ticker(region: str, ticker: str):
             market_cap=market_cap, avg_volume=avg_vol,
         )
         
-        result = compute_rocket_score(df, ti, current_price=price, social_sentiment=False)
+        result = compute_rocket_score(df, ti, current_price=price, social_sentiment=False, options_factor=enable_options)
         if result is None:
             return None
         
@@ -192,6 +192,8 @@ def scan_single_ticker(region: str, ticker: str):
             reason = ""
             family_votes = []
         
+        opts_data = result.get('options_data')
+        
         if signal == "BULLISH":
             signal = "BUY"
         elif signal == "BEARISH":
@@ -199,7 +201,7 @@ def scan_single_ticker(region: str, ticker: str):
         
         buy_count = sum(1 for fv in family_votes if fv.get('vote') == 'BUY')
         sell_count = sum(1 for fv in family_votes if fv.get('vote') == 'SELL')
-        return (ticker, signal, final_score, regime, buy_count, sell_count, reason)
+        return (ticker, signal, final_score, regime, buy_count, sell_count, reason, opts_data)
     except Exception:
         return None
 
@@ -219,14 +221,14 @@ def send_telegram_report(top_10, total, live_count, bot_token, chat_id):
             "📈 *Top 10 strongest signals:*",
         ]
         
-        buy_count = sum(1 for _, s, _, _, _, _, _ in top_10 if s == 'BUY')
-        sell_count = sum(1 for _, s, _, _, _, _, _ in top_10 if s == 'SELL')
-        hold_count = sum(1 for _, s, _, _, _, _, _ in top_10 if s == 'HOLD')
+        buy_count = sum(1 for _, s, _, _, _, _, _, _ in top_10 if s == 'BUY')
+        sell_count = sum(1 for _, s, _, _, _, _, _, _ in top_10 if s == 'SELL')
+        hold_count = sum(1 for _, s, _, _, _, _, _, _ in top_10 if s == 'HOLD')
         
         lines.append(f"BUY: {buy_count} | SELL: {sell_count} | HOLD: {hold_count}")
         lines.append("")
         
-        for rank, (ticker, signal, score, regime, buy_c, sell_c, reason) in enumerate(top_10, 1):
+        for rank, (ticker, signal, score, regime, buy_c, sell_c, reason, opts) in enumerate(top_10, 1):
             if score >= 0.60:
                 se = "🟣"
             elif score >= 0.20:
@@ -242,6 +244,13 @@ def send_telegram_report(top_10, total, live_count, bot_token, chat_id):
             lines.append(f"   Score: {score:.2f}  |  Regime: {regime}")
             if reason and len(reason) < 80:
                 lines.append(f"   ↳ {reason}")
+            # Options data
+            if opts:
+                mp = opts.get('max_pain_strike', '?')
+                bias = opts.get('bias', 0)
+                cr = opts.get('put_call_ratio', '?')
+                dte = opts.get('dte', '?')
+                lines.append(f"   📊 MP={mp} PCR={cr} DTE={dte} bias={bias:+.2f}")
             lines.append("")
         
         lines.append(f"🕒 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
@@ -308,6 +317,10 @@ def main():
         "--enable-meme-scores", action="store_true",
         help="Enable StockTwits + meme scores (sentiment + short interest + volume anomaly)"
     )
+    parser.add_argument(
+        "--options", action="store_true",
+        help="Enable options factor (Max Pain, GEX, PCR) for US tickers"
+    )
     args = parser.parse_args()
 
     print("🚀 Loading universe...", flush=True)
@@ -370,7 +383,7 @@ def main():
     DELAY_BETWEEN_CALLS = 1.5  # seconds
     
     for idx, (region, ticker) in enumerate(live_tickers, 1):
-        result = scan_single_ticker(region, ticker)
+        result = scan_single_ticker(region, ticker, enable_options=args.options)
         
         if result is not None:
             scored += 1
@@ -401,7 +414,7 @@ def main():
     
     print(f"\n🏆 Top 10 Signals:", flush=True)
     print("=" * 80, flush=True)
-    for rank, (ticker, signal, score, regime, buy_c, sell_c, reason) in enumerate(top_10, 1):
+    for rank, (ticker, signal, score, regime, buy_c, sell_c, reason, _) in enumerate(top_10, 1):
         emoji = "🟣" if score >= 0.60 else "🟢" if score >= 0.20 else "🔴" if score <= -0.60 else "🟠" if score <= -0.20 else "⚪"
         print(f"{rank}. {emoji} {ticker}: {signal} (score={score:.2f}, regime={regime})", flush=True)
         if reason and len(reason) < 100:
