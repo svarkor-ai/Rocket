@@ -3,10 +3,10 @@
 Each family (Trend, Momentum, Volume) votes independently.
 Within each family, majority rules. Between families, weighted average.
 
-Architecture:
-  Trend (3 indicators) → 35% weight
-  Momentum (3 indicators) → 35% weight
-  Volume (3 indicators) → 30% weight
+Architecture (evidence-based weighting):
+  Momentum (6 indicators) → 50% weight  [Tier 1: Jegadeesh & Titman 1993, Moskowitz et al. 2012]
+  Trend (14 indicators)   → 35% weight  [Tier 2: Chan 2007, Aronson 2011]
+  Volume (3 indicators)   → 15% weight  [Tier 3: weak evidence for directional prediction]
 
 Each indicator votes: BUY (+1), HOLD (0), SELL (-1)
 Family vote: sum of votes / max_possible (normalizes to [-1, 1])
@@ -55,6 +55,7 @@ class FamilyVote:
 
     @property
     def weight(self) -> float:
+        """Evidence-based weight from academic research (see FamilyWeights.WEIGHTS)."""
         return FamilyWeights.WEIGHTS[self.family]
 
 
@@ -78,9 +79,9 @@ class DirectionResult:
 class FamilyWeights:
     """Immutable weights for each family."""
     WEIGHTS: ClassVar[dict[FamilyName, float]] = {
-        FamilyName.TREND: 0.35,
-        FamilyName.MOMENTUM: 0.35,
-        FamilyName.VOLUME: 0.30,
+        FamilyName.MOMENTUM: 0.50,  # ↑ from 0.35 — strongest academic evidence (time-series momentum)
+        FamilyName.TREND: 0.35,     # maintained — good evidence but regime-dependent
+        FamilyName.VOLUME: 0.15,    # ↓ from 0.30 — weak academic backing for directional prediction
     }
 
 
