@@ -3,7 +3,7 @@ Phase 1: yf.download() batch → detect live tickers
 Phase 2: Sequential history() with retry + delay → compute scores
 Phase 3: Save to SQLite + send to Telegram
 """
-import sys, os, time, logging, asyncio, warnings, threading
+import argparse, sys, os, time, logging, asyncio, warnings, threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -264,8 +264,13 @@ def send_telegram_report(top_10, total, live_count, bot_token, chat_id):
         return False
 
 
-def save_to_db(top_10, total, live_count):
-    """Save top 10 to SQLite scan_history table."""
+def save_to_db(top_10, total, live_count, meme_scores=None):
+    """Save top 10 to SQLite scan_history table.
+
+    Args:
+        top_10: List of (ticker, signal, score, regime, buy_c, sell_c, reason).
+        meme_scores: Optional dict of ticker -> MemeSignal from meme score computation.
+    """
     import sqlite3
     db_path = Path('data/signals.db')
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -275,10 +280,18 @@ def save_to_db(top_10, total, live_count):
         buy_count INTEGER, sell_count INTEGER, reason TEXT,
         timestamp TEXT
     )''')
+    # Add meme_score column if it doesn't exist yet
+    try:
+        conn.execute("ALTER TABLE scan_history ADD COLUMN meme_score REAL")
+    except Exception:
+        pass  # column already exists
     for ticker, signal, score, regime, buy_c, sell_c, reason in top_10:
+        ms = 0.0
+        if meme_scores and ticker in meme_scores:
+            ms = meme_scores[ticker].meme_score
         conn.execute(
-            "INSERT INTO scan_history (ticker, signal, score, category, buy_count, sell_count, reason, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (ticker, signal, score, regime, buy_c, sell_c, reason[:500], datetime.now(timezone.utc).isoformat())
+            "INSERT INTO scan_history (ticker, signal, score, category, buy_count, sell_count, reason, timestamp, meme_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (ticker, signal, score, regime, buy_c, sell_c, reason[:500], datetime.now(timezone.utc).isoformat(), ms)
         )
     conn.commit()
     conn.close()
@@ -286,6 +299,17 @@ def save_to_db(top_10, total, live_count):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Rocket Stock Scanner")
+    parser.add_argument(
+        "--meme", action="store_true",
+        help="Enable meme scores (short interest + WSB sentiment) in report"
+    )
+    parser.add_argument(
+        "--enable-meme-scores", action="store_true",
+        help="Enable StockTwits + meme scores (sentiment + short interest + volume anomaly)"
+    )
+    args = parser.parse_args()
+
     print("🚀 Loading universe...", flush=True)
     universe = get_universe()
     
@@ -385,6 +409,44 @@ def main():
     
     # Save to signals.db scan_history
     save_to_db(top_10, total, len(live_tickers))
+
+    # Meme scores: StockTwits sentiment + FINVIZ short interest (optional)
+    if args.meme:
+        print("\n🎭 Computing meme scores (StockTwits + FINVIZ)...", flush=True)
+        try:
+            from rocket.social import meme_score_from_stocktwits
+            meme_tickers = [t for t, _, _, _, _, _, _ in top_10]
+            meme_results = {}
+            for ticker, signal, score, regime, buy_c, sell_c, reason in top_10:
+                # Fetch volume data from yfinance for this ticker
+                try:
+                    stock = yf.Ticker(ticker)
+                    hist = stock.history(period='3mo', interval='1d', timeout=10)
+                    if hist is not None and not hist.empty and 'Volume' in hist.columns:
+                        vols = hist['Volume'].dropna()
+                        avg_vol = float(vols.mean()) if len(vols) > 0 else 0.0
+                        vol = float(vols.iloc[-1]) if len(vols) > 0 else 0.0
+                    else:
+                        vol = 0.0
+                        avg_vol = 0.0
+                except Exception:
+                    vol = 0.0
+                    avg_vol = 0.0
+                ms = meme_score_from_stocktwits(ticker, vol, avg_vol)
+                meme_results[ticker] = ms
+            # Show results
+            for ticker, ms in meme_results.items():
+                flag = "🔥" if ms.is_meme_stock else "📊"
+                print(f"  {flag} {ticker}: meme_score={ms.meme_score:.0f}/100 "
+                      f"bull={ms.sentiment_bull_pct:.0f}% "
+                      f"short={ms.short_interest_pct:.1f}% "
+                      f"vol_spike={ms.volume_spike:.1f}x", flush=True)
+            # Save to DB
+            save_to_db(top_10, total, len(live_tickers), meme_results)
+        except Exception as e:
+            import traceback
+            print(f"  ⚠️ Meme score failed: {str(e)[:80]}", flush=True)
+            traceback.print_exc()
     
     # Send to Telegram
     if BOT_TOKEN and ADMIN_CHAT_ID:
