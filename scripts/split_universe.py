@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.universe import get_universe  # noqa: E402
+from rocket.data.universe_builder import get_universe  # noqa: E402
 
 
 def main():
