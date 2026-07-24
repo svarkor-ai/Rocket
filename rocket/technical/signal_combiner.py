@@ -19,12 +19,12 @@ class SignalSummary:
 
 
 class SignalCombiner:
-    """Combine signals from multiple indicators by category."""
+    """Combine indicator signals into a summary using evidence-based category weights."""
 
     CATEGORY_WEIGHTS = {
-        SignalCategory.MOMENTUM: 0.40,
-        SignalCategory.TREND: 0.30,
-        SignalCategory.VOLATILITY: 0.20,
+        SignalCategory.MOMENTUM: 0.50,
+        SignalCategory.TREND: 0.35,
+        SignalCategory.VOLATILITY: 0.05,
         SignalCategory.VOLUME: 0.10,
     }
 
