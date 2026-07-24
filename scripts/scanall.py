@@ -147,7 +147,7 @@ def scan_single_ticker(region: str, ticker: str):
             t = threading.Thread(target=_fetch_info, daemon=True)
             t.start()
             t.join(timeout=5)
-            info = result[0] if t.is_alive() else {}
+            info = result[0] if not t.is_alive() else {}
         except Exception:
             info = {}
         
