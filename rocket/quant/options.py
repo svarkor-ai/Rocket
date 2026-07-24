@@ -46,6 +46,11 @@ class OptionsResult:
 # Core calculations
 # ---------------------------------------------------------------------------
 
+def _build_oi_map(df) -> dict:
+    """Build {strike: openInterest} from a calls/puts DataFrame."""
+    return dict(zip(df["strike"], df["openInterest"].astype(float)))
+
+
 def compute_max_pain(
     calls_df,
     puts_df,
@@ -55,16 +60,6 @@ def compute_max_pain(
 
     Max Pain = strike price where total option value (calls + puts)
     at expiration is minimized → maximum loss for option buyers.
-
-    Parameters
-    ----------
-    calls_df : DataFrame  — yfinance calls chain (must have 'strike' and 'openInterest')
-    puts_df : DataFrame  — yfinance puts chain
-    current_price : float  — current stock price
-
-    Returns
-    -------
-    float : Max Pain strike price
     """
     strikes = set(calls_df["strike"].unique()) | set(puts_df["strike"].unique())
     if not strikes:
@@ -78,17 +73,22 @@ def compute_max_pain(
         return current_price
 
     pains = {}
+    call_oi_map = _build_oi_map(calls_df)
+    put_oi_map = _build_oi_map(puts_df)
+
     for strike in strikes:
-        # Call value at expiration = max(0, price - strike), but we use OI as weight
-        call_oi = calls_df[calls_df["strike"] == strike]["openInterest"].sum() if strike in calls_df["strike"].values else 0
-        put_oi = puts_df[puts_df["strike"] == strike]["openInterest"].sum() if strike in puts_df["strike"].values else 0
-
-        # Value lost by call buyers if settled at this strike
-        call_loss = max(0, current_price - strike) * call_oi
-        # Value lost by put buyers
-        put_loss = max(0, strike - current_price) * put_oi
-
-        pains[strike] = call_loss + put_loss
+        # Total intrinsic value if underlying closes at THIS strike:
+        #   calls: max(0, strike - call_strike) × call_OI
+        #   puts:  max(0, put_strike - strike) × put_OI
+        # Max Pain = strike that MINIMIZES this total value
+        total_value = 0.0
+        for ck, co in call_oi_map.items():
+            if co > 0:
+                total_value += max(0.0, strike - ck) * co
+        for pk, po in put_oi_map.items():
+            if po > 0:
+                total_value += max(0.0, pk - strike) * po
+        pains[strike] = total_value
 
     # Strike with minimum total loss for buyers = Max Pain
     min_pain_strike = min(pains.items(), key=lambda x: x[1])[0]
