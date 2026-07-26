@@ -24,6 +24,9 @@ data/*.pkl
 data/tickers/
 data/ohlcv/
 data/signals.db
+data/*.db
+data/*.csv
+data/*.json
 logs/
 
 # IDE
