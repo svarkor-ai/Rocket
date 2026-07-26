@@ -22,9 +22,9 @@ htmlcov/
 data/*.parquet
 data/*.pkl
 data/tickers/
+data/ohlcv/
+data/signals.db
 logs/
-*.db
-*.sqlite
 
 # IDE
 .vscode/
