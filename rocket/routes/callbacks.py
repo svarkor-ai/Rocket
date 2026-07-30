@@ -19,6 +19,11 @@ from rocket.technical.volatility import BollingerBands, ATR
 from rocket.technical.volume import OBV, MFI, VWAPIndicator
 from rocket.technical.advanced import IchimokuCloud, Supertrend
 
+# For Top Signals callback
+import json
+from pathlib import Path
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 # Cache for computed data
@@ -443,3 +448,58 @@ def setup_callbacks(app):
         logger.info(f"Exported {len(df)} scores to {export_path}")
 
         return store_data
+
+    # ── Top Signals: load from daily_signals.json ──────────────────
+    @app.callback(
+        Output("top-signals-status", "children"),
+        Output("top-signals-content", "children"),
+        Input("main-tabs", "active_tab"),
+    )
+    def load_top_signals(active_tab):
+        """Load and display top signals from daily_signals.json."""
+        if active_tab != "tab-top-signals":
+            return "Not active", "Switch to this tab to view signals"
+
+        signals_file = Path(__file__).parents[2] / "data" / "daily_signals.json"
+        if not signals_file.exists():
+            return "No data file found", html.P(
+                "No daily_signals.json found. Run daily scoring to generate data.",
+                className="text-muted text-center",
+            )
+
+        try:
+            with open(signals_file, "r") as f:
+                data = json.load(f)
+            signals = data.get("signals", data.get("results", []))
+        except Exception as e:
+            return f"Error: {e}", html.P("Failed to load signals.", className="text-muted text-center")
+
+        if not signals:
+            return "No signals", html.P("No signals in data file.", className="text-muted text-center")
+
+        # Sort by composite score
+        signals = sorted(signals, key=lambda s: s.get("composite_score", 0), reverse=True)
+
+        # Count signals
+        buy_count = sum(1 for s in signals if s.get("signal") == "BUY")
+        sell_count = sum(1 for s in signals if s.get("signal") == "SELL")
+        hold_count = sum(1 for s in signals if s.get("signal") == "HOLD")
+        total = len(signals)
+
+        status = (
+            f"Loaded {total} signals: "
+            f"BUY: {buy_count} | SELL: {sell_count} | HOLD: {hold_count} | "
+            f"Generated: {signals[0].get('timestamp', 'N/A')[:19]}"
+        )
+
+        # Build table
+        cols = [{"name": str(k), "id": str(k)} for k in signals[0].keys()]
+        import pandas as pd
+        table = dbc.Table.from_dataframe(
+            pd.DataFrame(signals),
+            striped=True, dark=True, bordered=True, hover=True, responsive=True,
+            style_header={"backgroundColor": "#16213e", "color": "#e0e0e0", "fontWeight": "bold"},
+            style_cell={"backgroundColor": "#1a1a2e", "color": "#e0e0e0", "padding": "10px"},
+        )
+
+        return status, table
