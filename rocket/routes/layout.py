@@ -112,6 +112,23 @@ def _build_tab_sentiment():
     ], className="mb-3 border-0")
 
 
+def _build_tab_top_signals():
+    """Tab 5: Top Buy/Sell Signals from daily_signals.json."""
+    return dbc.Card([
+        dbc.CardHeader(
+            html.H4(_tab_icon("star"), "Top 10-25 Signals", className="mb-0"),
+            className="bg-dark border-bottom border-secondary"),
+        dbc.CardBody([
+            html.Div(id="top-signals-status", children=[
+                html.P("Loading signals from daily scan...", className="text-muted text-center"),
+            ]),
+            html.Div(id="top-signals-content", children=[
+                html.P("No data yet. Run daily scoring to populate signals.", className="text-muted text-center"),
+            ]),
+        ]),
+    ], className="mb-3 border-0")
+
+
 def _build_tab_settings():
     """Tab 5: Settings."""
     return dbc.Card([
@@ -168,6 +185,8 @@ def build_layout(region_scores=None, news_articles=None, bt_result=None):
                 label="Backtest", tab_id="tab-backtest"),
         dbc.Tab(_build_tab_sentiment(),
                 label="Sentiment", tab_id="tab-sentiment"),
+        dbc.Tab(_build_tab_top_signals(),
+                label="Top Signals", tab_id="tab-top-signals"),
         dbc.Tab(_build_tab_settings(),
                 label="Settings", tab_id="tab-settings"),
     ], id="main-tabs", active_tab="tab-rankings")
