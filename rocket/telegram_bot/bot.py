@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram.ext import Application, ApplicationBuilder, CommandHandler
 
 from rocket.users.store import UserStore
 

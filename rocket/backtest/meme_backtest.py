@@ -4,6 +4,8 @@ Backtests meme stock patterns to identify recurring signals
 and measure historical performance of meme stock trading strategies.
 """
 import logging
+
+import pandas as pd
 from typing import List, Dict, Optional, TypedDict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
