@@ -13,7 +13,10 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
+import logging
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 # FINVIZ short interest screener page
 _URL = "https://finviz.com/screener.ashx?v=152"

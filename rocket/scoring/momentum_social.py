@@ -9,6 +9,8 @@ Supports backtesting of meme stock patterns.
 """
 import logging
 from typing import List, Dict, Optional, TypedDict
+
+import pandas as pd
 from dataclasses import dataclass, field
 import numpy as np
 
@@ -296,7 +298,7 @@ class MemePatternDetector:
         if avg_vol == 0:
             return {'ticker': '', 'pattern': 'none', 'score': 0, 'confidence': 0, 'details': ''}
         
-        ratio = current_vol / avg_ratio
+        ratio = current_vol / avg_vol
         vol_ratio = current_vol / avg_vol
         
         # Score based on volume spike magnitude

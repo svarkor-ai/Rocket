@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
+from rocket.users.store import UserStore
 from rocket.scan_engine.engine import SignalEngine
 from rocket.scan_engine.storage import SignalStorage
 from rocket.telegram_bot.notifications import (
