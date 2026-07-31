@@ -18,6 +18,9 @@ from enum import Enum
 from typing import Any
 
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 from ..data.models import TickerInfo
 from ..technical.families import IndicatorVote, FamilyVote, Vote, FamilyName, combine, compute_family_votes
