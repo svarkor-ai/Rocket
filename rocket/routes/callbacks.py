@@ -45,7 +45,7 @@ def _build_indicator_results(df: pd.DataFrame) -> list:
             r = ind.calculate(df)
             results.append(r)
         except Exception as e:
-            logger.warning(f"Indicator {ind.name if hasattr(ind, 'name') else 'unknown'} failed: {e}")
+            logger.warning(f"Indicator {ind.name if hasattr(ind, 'name') else 'unknown'} failed")
     return results
 
 
@@ -147,7 +147,7 @@ def setup_callbacks(app):
                 try:
                     save_ohlcv("/tmp/rocket-ohlcv", ticker, df)
                 except Exception as e:
-                    logger.debug(f"Save failed for {ticker}: {e}")
+                    logger.debug(f"Save failed for {ticker}")
 
         # Rank regions using RocketScore objects
         region_scores = {region: rocket_scores}

@@ -120,7 +120,7 @@ def _fetch_batch(tickers_batch: List[str], period: str) -> Dict[str, pd.DataFram
             return results
             
         except Exception as e:
-            logger.warning(f"Batch fetch attempt {attempt+1} failed: {e}")
+            logger.warning(f"Batch fetch attempt {attempt+1} failed")
             time.sleep(2 * (attempt + 1))
     
     return {}

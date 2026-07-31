@@ -203,7 +203,7 @@ def compute_rocket_score(
             r = indicator.calculate(df)
             results.append(r)
         except Exception:
-            pass
+            logger.warning("Direction indicator calculation failed")
 
     # ─── Step 1b: Run direction indicators only for voting ───
     # BB and ATR are risk-only — they must NOT vote in family consensus
@@ -213,7 +213,7 @@ def compute_rocket_score(
             r = indicator.calculate(df)
             direction_results.append(r)
         except Exception:
-            pass
+            logger.warning("Direction indicator calculation failed")
 
     # ─── Step 2: Convert direction results to IndicatorVotes ───
     indicator_votes = []
@@ -225,7 +225,7 @@ def compute_rocket_score(
                 indicator_votes.append(vote)
                 indicator_strengths.append(vote.strength)
         except Exception:
-            pass
+            logger.warning("Direction indicator calculation failed")
 
     # ─── Step 3: Family consensus → Direction ───
     direction_result, family_votes = combine(indicator_votes)

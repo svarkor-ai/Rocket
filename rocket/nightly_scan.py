@@ -148,8 +148,8 @@ def run(regions: list, test: bool = False, test_limit: int = 5):
                 ))
                 all_states.append(state)
 
-            except Exception as e:
-                logger.error(f"{ticker}: {e}")
+            except Exception:
+                logger.error(f"{ticker}")
 
         storage._conn.commit()
 

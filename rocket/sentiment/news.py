@@ -43,5 +43,5 @@ def fetch_news(tickers: List[str], max_articles: int = 10) -> List[NewsArticle]:
                 )
                 articles.append(article)
         except Exception as e:
-            logger.warning(f"Failed to fetch news for {ticker}: {e}")
+            logger.warning(f"Failed to fetch news for {ticker}")
     return articles

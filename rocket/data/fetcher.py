@@ -38,13 +38,13 @@ def _fetch_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame | Non
         except (ConnectionError, OSError, ValueError) as e:
             if attempt < _MAX_RETRIES:
                 wait = _RETRY_DELAY_S * attempt
-                logger.warning(f"{ticker}: yfinance attempt {attempt} failed ({e}), retrying in {wait}s")
+                logger.warning(f"{ticker}: yfinance attempt {attempt} failed, retrying in {wait}s")
                 time.sleep(wait)
             else:
-                logger.warning(f"{ticker}: yfinance failed after {attempt} attempts: {e}")
+                logger.warning(f"{ticker}: yfinance failed after {attempt} attempts")
         except Exception as e:
             # Non-retryable (e.g. parsing error) — break immediately
-            logger.warning(f"{ticker}: non-retryable error: {type(e).__name__}: {e}")
+            logger.warning(f"{ticker}: non-retryable error")
             break
     return None
 
