@@ -63,7 +63,7 @@ def _try_rss_fallback(ticker: str, subreddits: List[str]) -> List[str]:
                    ticker.upper() in title.upper():
                     all_posts.append(f"{title} {entry.get('summary', '')[:200]}")
         except Exception as e:
-            logger.warning(f"RSS search failed for {ticker} in {sub}: {e}")
+            logger.warning(f"RSS search failed for {ticker} in {sub}")
     
     return all_posts
 
@@ -114,7 +114,7 @@ def fetch_reddit_sentiment(
                                         f"{title} — score:{child.get('score', 0)}"
                                     )
                 except Exception as e:
-                    logger.warning(f"Reddit OAuth search failed for {ticker} in {sub}: {e}")
+                    logger.warning(f"Reddit OAuth search failed for {ticker} in {sub}")
                     continue
         else:
             # RSS fallback
@@ -197,7 +197,7 @@ def fetch_subreddit_activity(
                         'total_posts_analyzed': len(children),
                     }
         except Exception as e:
-            logger.warning(f"Reddit activity failed for {sub}: {e}")
+            logger.warning(f"Reddit activity failed for {sub}")
             results[sub] = {'error': str(e)}
     
     return results
@@ -249,7 +249,7 @@ def monitor_user_activity(
                 # RSS fallback — limited user search
                 logger.info(f"OAuth not available, skipping user {username} search")
         except Exception as e:
-            logger.warning(f"User monitor failed for {username} in {sub}: {e}")
+            logger.warning(f"User monitor failed for {username} in {sub}")
     
     user_activity['posts'] = sorted(
         user_activity['posts'],

@@ -309,7 +309,7 @@ class SignalEngine:
                 if ev is not None:
                     events.append(ev)
             except (KeyError, IndexError, ValueError) as e:
-                logger.error(f"{t}: scan error (invalid data): {e}")
+                logger.error(f"{t}: scan error (invalid data)")
             except Exception as e:
-                logger.error(f"{t}: scan error (unexpected): {type(e).__name__}: {e}")
+                logger.error(f"{t}: scan error")
         return events

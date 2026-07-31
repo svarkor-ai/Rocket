@@ -162,7 +162,7 @@ class DailyScoring:
                 if key in k or k in ticker.upper():
                     return max(0.0, min(1.0, (v.score + 1.0) / 2.0))
         except Exception:
-            pass
+            logger.warning("Scoring calculation failed silently")
         return 0.5  # Neutral
 
     # ── Scoring ───────────────────────────────────────────────────

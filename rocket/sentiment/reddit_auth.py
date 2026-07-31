@@ -178,7 +178,7 @@ class RedditSession:
                     logger.info("Loaded saved Reddit tokens")
                     return
             except Exception as e:
-                logger.warning(f"Failed to load saved tokens: {e}")
+                logger.warning("Failed to load saved tokens")
     
     def _save_tokens(self):
         """Save tokens to disk."""
@@ -239,7 +239,7 @@ class RedditSession:
             self._save_tokens()
             return True
         except Exception as e:
-            logger.warning(f"Token refresh failed: {e}")
+            logger.warning("Token refresh failed")
             return False
     
     def get_headers(self):
@@ -291,7 +291,7 @@ class RedditSession:
             data = json.loads(resp.read().decode())
             return data
         except Exception as e:
-            logger.warning(f"Reddit API request failed: {e}")
+            logger.warning("Reddit API request failed")
             return None
     
     def close(self):

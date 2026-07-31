@@ -157,7 +157,7 @@ def _load_us_tickers_from_csv() -> set[str]:
                 logger.info(f"Loaded {US_TICKERS_CACHE.name} ({len(content)} chars)")
                 return _parse_csv_content(content)
         except IOError:
-            pass
+            logger.warning("Failed to write local tickers cache")
 
     # Download CSV
     try:
@@ -171,7 +171,7 @@ def _load_us_tickers_from_csv() -> set[str]:
         logger.info(f"Downloaded US tickers CSV ({len(content)} chars)")
         return _parse_csv_content(content)
     except Exception as e:
-        logger.warning(f"Failed to load US tickers CSV: {e}")
+        logger.warning("Failed to load US tickers CSV")
         return set()
 
 
@@ -223,7 +223,7 @@ def _load_tickers_from_local_source(source: dict) -> list[str]:
             logger.warning(f"Unsupported local source type: {source_type}")
             return []
     except Exception as e:
-        logger.warning(f"Failed to load tickers from {filepath}: {e}")
+        logger.warning("Failed to load tickers from {filepath}")
         return []
 
 
@@ -389,10 +389,10 @@ def _extract_tickers_from_wikipedia(page_name: str) -> list[str]:
         if e.response is not None and e.response.status_code == 404:
             logger.warning(f"Wikipedia page not found: {page_name}")
         else:
-            logger.warning(f"Wikipedia fetch failed for {page_name}: {e}")
+            logger.warning(f"Wikipedia fetch failed for {page_name}")
         return []
     except Exception as e:
-        logger.warning(f"Wikipedia fetch failed for {page_name}: {e}")
+        logger.warning(f"Wikipedia fetch failed for {page_name}")
         return []
 
     if resp.status_code != 200:

@@ -54,7 +54,7 @@ def _load_cache() -> dict[str, dict]:
         if isinstance(data, dict):
             return data
     except Exception:
-        pass
+        logger.debug("Short interest operation failed")
     return {}
 
 
@@ -69,7 +69,7 @@ def _save_cache(data: dict[str, dict]) -> None:
         with open(_CACHE_FILE, "w") as f:
             json.dump(data, f)
     except Exception:
-        pass
+        logger.debug("Short interest operation failed")
 
 
 def scrape_short_interest() -> dict[str, dict]:

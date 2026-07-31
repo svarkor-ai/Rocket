@@ -91,7 +91,7 @@ class MomentumScorer:
             return float(np.clip(score, 0, 100))
         
         except Exception as e:
-            logger.warning(f"Momentum scoring failed: {e}")
+            logger.warning("Momentum scoring failed")
             return 50.0
     
     def _price_momentum(self, close: 'pd.Series') -> float:
