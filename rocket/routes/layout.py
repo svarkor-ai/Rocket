@@ -12,7 +12,7 @@ def _build_table(scores):
     """Build a dash DataTable from a list of score dicts."""
     if not scores:
         return html.P("No scores available.", className="text-center text-muted")
-    cols = [{"name": str(k), "id": str(k)} for k in scores[0].keys()]
+    [{"name": str(k), "id": str(k)} for k in scores[0].keys()]
     import pandas as pd
     return dbc.Table.from_dataframe(
         pd.DataFrame(scores),

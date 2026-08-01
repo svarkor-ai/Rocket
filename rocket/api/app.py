@@ -3,17 +3,15 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..scan_engine.engine import SignalEngine
 from ..scan_engine.storage import SignalStorage
-from ..technical.models import Signal, SignalCategory
 
 logger = logging.getLogger(__name__)
 

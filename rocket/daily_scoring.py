@@ -29,7 +29,6 @@ from rocket.technical.trend import EMA9, EMA21, EMA50
 from rocket.technical.volatility import BollingerBands, ATR, DonchianChannel
 from rocket.technical.volume import OBV, MFI, VWAPIndicator
 from rocket.technical.signal_combiner import SignalCombiner, SignalSummary
-from rocket.technical.models import SignalCategory
 
 logger = logging.getLogger(__name__)
 
@@ -173,10 +172,10 @@ class DailyScoring:
         Returns: -1.0 .. 1.0 range where >0.15 = BUY, <−0.15 = SELL
         """
         w = self.weights
-        
+
         # Blend sentiment (0..1) into -1..1 range for the sentiment weight
         sent_score = (sentiment_norm * 2) - 1.0
-        
+
         composite = (
             summary.overall_score * (1 - w.get("sentiment", 0.20))
             + sent_score * w.get("sentiment", 0.20)

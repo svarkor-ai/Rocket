@@ -19,7 +19,7 @@ class IchimokuCloud(BaseIndicator):
 
     def calculate(self, df: pd.DataFrame) -> IndicatorResult:
         df = self._normalize_columns(df)
-        mid = (df['high'] + df['low']) / 2
+        (df['high'] + df['low']) / 2
 
         cl = (
             df['high'].rolling(self.conversion).max()

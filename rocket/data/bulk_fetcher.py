@@ -12,7 +12,6 @@ import json
 import logging
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -42,10 +41,10 @@ def load_universe(regions: Optional[List[str]] = None) -> List[str]:
     """Load tickers from universe cache, optionally filtered by regions."""
     with open(UNIVERSE_CACHE) as f:
         data = json.load(f)
-    
+
     tickers = data.get("tickers", {})
     result = []
-    
+
     if regions:
         for region in regions:
             if region in tickers:
@@ -53,7 +52,7 @@ def load_universe(regions: Optional[List[str]] = None) -> List[str]:
     else:
         for region, ticker_list in tickers.items():
             result.extend(ticker_list)
-    
+
     # Deduplicate
     return list(set(result))
 
@@ -84,7 +83,7 @@ def _fetch_batch(tickers_batch: List[str], period: str) -> Dict[str, pd.DataFram
     Returns: ticker -> DataFrame for successfully fetched tickers only.
     """
     results = {}
-    
+
     for attempt in range(3):
         try:
             df = yf.download(
@@ -96,11 +95,11 @@ def _fetch_batch(tickers_batch: List[str], period: str) -> Dict[str, pd.DataFram
                 timeout=30,
                 group_by="ticker"  # easier to split by ticker
             )
-            
+
             if df is None or df.empty:
                 logger.warning(f"Batch {tickers_batch[:3]}: empty response")
                 return {}
-            
+
             # yfinance returns MultiIndex columns when group_by="ticker"
             # Columns: (ticker, open), (ticker, high), ...
             # Or single Index when only one ticker
@@ -116,13 +115,13 @@ def _fetch_batch(tickers_batch: List[str], period: str) -> Dict[str, pd.DataFram
                         ticker_df.index.name = 'date'  # type: ignore
                         if len(ticker_df) > 0:
                             results[ticker] = ticker_df
-            
+
             return results
-            
-        except Exception as e:
+
+        except Exception:
             logger.warning(f"Batch fetch attempt {attempt+1} failed")
             time.sleep(2 * (attempt + 1))
-    
+
     return {}
 
 
@@ -139,14 +138,14 @@ def save_parquet(ticker: str, df: pd.DataFrame) -> None:
     df = df.copy()
     df = df.reset_index()
     df["year"] = df["date"].dt.year  # type: ignore
-    
+
     for year, year_df in df.groupby("year"):
         year_df = year_df.drop(columns=["year"])
         year_df = year_df[["open", "high", "low", "close", "volume"]]
-        
+
         ticker_dir = OHLCV_DIR / ticker
         os.makedirs(ticker_dir, exist_ok=True)
-        
+
         filepath = ticker_dir / f"{year}.parquet"
         year_df.to_parquet(filepath, engine="pyarrow", compression="snappy")
 
@@ -154,22 +153,22 @@ def save_parquet(ticker: str, df: pd.DataFrame) -> None:
 def load_existing_count() -> Dict:
     """Load list of already-downloaded (ticker, year) pairs."""
     existing = {"ok": set(), "incomplete": set()}
-    
+
     if not OHLCV_DIR.exists():
         return existing
-    
+
     for ticker_dir in OHLCV_DIR.iterdir():
         if ticker_dir.is_dir():
             ticker = ticker_dir.name
             years = set()
             for p in ticker_dir.glob("*.parquet"):
                 years.add(int(p.stem))
-            
+
             if len(years) >= 10:
                 existing["ok"].add(ticker)
             else:
                 existing["incomplete"].add(ticker)
-    
+
     return existing
 
 
@@ -190,54 +189,54 @@ def fetch_all(
     Returns: summary dict with counts.
     """
     logger.info(f"Starting bulk OHLCV fetch: {len(tickers)} tickers, period={period}")
-    
+
     # Load checkpoint
     state = load_checkpoint() if resume else {"completed": {"tickers": set(), "failed": set()}, "failed": {}, "started_at": None, "last_updated": None}
-    
+
     if state["started_at"] is None:
         state["started_at"] = datetime.now(timezone.utc).isoformat()
-    
+
     # Identify what to fetch
     completed = set(state.get("completed", {}).get("tickers", []))
     failed = set(state.get("completed", {}).get("failed", []))
-    
+
     if resume:
         remaining = [t for t in tickers if t not in completed and t not in failed]
     else:
         remaining = list(set(tickers))  # deduplicate
-    
+
     logger.info(f"Remaining to fetch: {len(remaining)} (completed: {len(completed)}, failed: {len(failed)})")
-    
+
     if not remaining:
         logger.info("Nothing to fetch — all done!")
         return {"remaining": 0, "completed": len(completed), "failed": len(failed)}
-    
+
     # Fetch in batches
     total_fetched = 0
     batch_start = time.time()
-    
+
     for i in range(0, len(remaining), BATCH_SIZE):
         batch = remaining[i:i + BATCH_SIZE]
         batch_num = i // BATCH_SIZE + 1
-        
+
         # Send batch directly — _fetch_batch handles failures internally
         results = _fetch_batch(batch, period)
-        
+
         for ticker, df in results.items():
             save_parquet(ticker, df)
             completed.add(ticker)
             total_fetched += 1
-        
+
         # Track failures (tickers in batch but not in results)
         for ticker in batch:
             if ticker not in completed and ticker not in failed:
                 failed.add(ticker)
                 state["failed"][ticker] = {"reason": "fetch_failed", "time": datetime.now(timezone.utc).isoformat()}  # type: ignore
-        
+
         # Save checkpoint (store sets as lists for JSON)
         state["completed"] = {"tickers": list(completed), "failed": list(failed)}
         save_checkpoint(state)
-        
+
         # Progress reporting
         elapsed = time.time() - batch_start
         progress = (i + len(batch)) / len(remaining) * 100
@@ -247,10 +246,10 @@ def fetch_all(
             f"fetched {len(results)}/{len(batch)} | total: {total_fetched} | "
             f"progress: {progress:.0f}% | eta: {eta:.0f}s"
         )
-        
+
         # Rate limiting between batches
         time.sleep(BATCH_DELAY)
-    
+
     return {
         "remaining": 0,
         "completed": len(completed),
@@ -269,15 +268,15 @@ def main():
     parser.add_argument("--workers", type=int, default=MAX_WORKERS, help=f"Max parallel workers (default: {MAX_WORKERS})")
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE, help=f"Batch size (default: {BATCH_SIZE})")
     parser.add_argument("--dry-run", action="store_true", help="Just show what would be fetched")
-    
+
     args = parser.parse_args()
-    
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-    
+
     # Load tickers
     tickers = load_universe(args.regions)
     logger.info(f"Loaded {len(tickers)} tickers from universe cache")
-    
+
     if args.dry_run:
         # Show region breakdown
         with open(UNIVERSE_CACHE) as f:
@@ -289,12 +288,12 @@ def main():
         print("-" * 32)
         print(f"{'TOTAL':<20} {len(tickers):>10}")
         return
-    
+
     # Fetch
     summary = fetch_all(tickers, period=args.period, resume=args.resume)
-    
+
     print(f"\n{'='*50}")
-    print(f"  FETCH COMPLETE")
+    print("  FETCH COMPLETE")
     print(f"{'='*50}")
     print(f"  Completed: {summary['completed']:,} tickers")
     print(f"  Failed:    {summary['failed']:,} tickers")

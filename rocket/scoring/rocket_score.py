@@ -13,18 +13,17 @@ Pipeline:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
 
 from ..data.models import TickerInfo
-from ..technical.families import IndicatorVote, FamilyVote, Vote, FamilyName, combine, compute_family_votes
-from ..technical.signal_combiner import SignalSummary, SignalCombiner  # kept for backward compat
+from ..technical.families import IndicatorVote, Vote, FamilyName, combine
+from ..technical.signal_combiner import SignalCombiner  # kept for backward compat
 from ..technical.momentum import RSI, MACD, ROC, Stochastic, WilliamsR, CCI
 from ..technical.trend import EMACrossover, ADX, EMA9, EMA21, EMA50, EMA200
 from ..technical.volatility import BollingerBands, ATR, DonchianChannel
@@ -35,8 +34,8 @@ from ..technical.patterns import (
     AutoFractal, CupAndHandle, PatternDetectorCombined,
 )
 from .filter import apply_filters
-from .risk import compute_risk, RiskResult
-from .confidence import compute_confidence, ConfidenceResult
+from .risk import compute_risk
+from .confidence import compute_confidence
 from .fundamentals_filter import evaluate_fundamentals, FundamentalFilterResult
 from ..technical.regime import detect_regime, RegimeResult, Regime
 from ..social.sentiment import get_social_sentiment, get_social_score
@@ -395,7 +394,7 @@ def compute_rocket_score(
     direction = "BULLISH" if final_score > 0 else "BEARISH"
 
     # Build reason string
-    family_details = [
+    [
         f"{fv.family.value}: {fv.vote.value} ({fv.strength:+.2f})"
         for fv in family_votes
     ]

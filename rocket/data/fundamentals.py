@@ -156,7 +156,7 @@ def fetch_fundamentals(
             result[ticker] = data
             if cache:
                 _fund_cache[ticker] = data
-        except Exception as e:
+        except Exception:
             logger.warning(f"Failed to fetch fundamentals for {ticker}")
 
         # Rate limit

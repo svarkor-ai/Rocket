@@ -8,10 +8,11 @@ import numpy as np
 from dash import html
 from dash_bootstrap_components import Table as dbc
 
+logger = logging.getLogger(__name__)
 from rocket.data.fetcher import fetch_ohlcv
 from rocket.data.universe import get_universe
-from rocket.data.storage import save_ohlcv, load_ohlcv, needs_update
-from rocket.data.models import TickerInfo, Region
+from rocket.data.storage import save_ohlcv, load_ohlcv
+from rocket.data.models import TickerInfo
 from rocket.scoring.rocket_score import compute_rocket_score
 from rocket.scoring.ranking import rank_regions, top_overall
 from rocket.scoring.models import RocketScore
@@ -24,9 +25,7 @@ from rocket.technical.advanced import IchimokuCloud, Supertrend
 # For Top Signals callback
 import json
 from pathlib import Path
-import pandas as pd
 
-logger = logging.getLogger(__name__)
 
 # Cache for computed data
 _computed_cache: dict = {}
@@ -46,7 +45,7 @@ def _build_indicator_results(df: pd.DataFrame) -> list:
         try:
             r = ind.calculate(df)
             results.append(r)
-        except Exception as e:
+        except Exception:
             logger.warning(f"Indicator {ind.name if hasattr(ind, 'name') else 'unknown'} failed")
     return results
 
@@ -86,7 +85,7 @@ def _score_ticker(ticker: str, df: pd.DataFrame) -> tuple:
     rocket_score = result["rocket_score"]
     rocket_score.current_price = current_price  # for display
     rocket_score.avg_volume = avg_vol  # for display
-    
+
     return rocket_score, _rocket_to_dict(rocket_score)
 
 
@@ -129,7 +128,7 @@ def setup_callbacks(app):
         if not tickers:
             return None, "No tickers in region", "—"
 
-        status_text = f"Fetching {len(tickers)} tickers…"
+        f"Fetching {len(tickers)} tickers…"
         logger.info(f"Starting refresh: {len(tickers)} tickers in {region}")
 
         # Fetch OHLCV data
@@ -148,7 +147,7 @@ def setup_callbacks(app):
                 # Save to parquet cache
                 try:
                     save_ohlcv("/tmp/rocket-ohlcv", ticker, df)
-                except Exception as e:
+                except Exception:
                     logger.debug(f"Save failed for {ticker}")
 
         # Rank regions using RocketScore objects
@@ -186,8 +185,6 @@ def setup_callbacks(app):
         State("data-store", "data"),
     )
     def show_ticker_detail(ticker, store_data):
-        from dash import dash_table
-        from dash import dcc
 
         if not ticker or not store_data:
             return {}, "No data available"
@@ -242,7 +239,6 @@ def setup_callbacks(app):
         State("data-store", "data"),
     )
     def run_backtest(strategy, ticker, store_data):
-        from dash import dcc
         import plotly.graph_objects as go
 
         if not ticker or not strategy:
@@ -276,7 +272,7 @@ def setup_callbacks(app):
 
         for i in range(1, len(df)):
             row = df.iloc[i]
-            prev_row = df.iloc[i - 1]
+            df.iloc[i - 1]
             close = row['close']
             date = row.name if hasattr(row.name, 'strftime') else str(row.name)
 
@@ -495,7 +491,7 @@ def setup_callbacks(app):
         )
 
         # Build table
-        cols = [{"name": str(k), "id": str(k)} for k in signals[0].keys()]
+        [{"name": str(k), "id": str(k)} for k in signals[0].keys()]
         import pandas as pd
         table = dbc.Table.from_dataframe(
             pd.DataFrame(signals),

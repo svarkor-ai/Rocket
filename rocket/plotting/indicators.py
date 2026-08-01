@@ -1,6 +1,6 @@
 """Add technical indicators to an existing candlestick chart."""
 import plotly.graph_objects as go
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 
 def add_indicators_to_chart(

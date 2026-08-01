@@ -79,7 +79,7 @@ class TelegramNotifier:
         buy_signals = [s for s in signals if s.get("signal") == "BUY"]
         sell_signals = [s for s in signals if s.get("signal") == "SELL"]
         hold_signals = [s for s in signals if s.get("signal") == "HOLD"]
-        msg = f"Rocket Scanner - Top Signals\n\n"
+        msg = "Rocket Scanner - Top Signals\n\n"
         msg += f"BUY: {len(buy_signals)} | SELL: {len(sell_signals)} | HOLD: {len(hold_signals)}\n\n"
         if buy_signals:
             msg += "Top Buys:\n"

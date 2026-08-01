@@ -1,6 +1,6 @@
 """Backtest result models."""
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List
 from datetime import datetime
 
 

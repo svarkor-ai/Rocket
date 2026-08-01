@@ -1,5 +1,4 @@
 """Volatility indicators — ATR, Bollinger Bands."""
-import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from .base import BaseIndicator, normalize_score
