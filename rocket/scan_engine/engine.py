@@ -112,7 +112,7 @@ def _apply_strength_hysteresis(
                 return SignalStrength.BULLISH
     else:
         # Transitioning — check if we crossed the IN threshold
-        h[new_strength]["in"]
+        # (h[new_strength]["in"] is read via the explicit checks below)
         if new_strength == SignalStrength.VERY_BEARISH:
             if score > -0.55:  # didn't cross into V-Bearish zone
                 return SignalStrength.BEARISH
@@ -242,22 +242,8 @@ class SignalEngine:
 
         # Min score gate — only emit for notable signals
         if new_signal == Signal.BUY and score < self.min_score:
-            prev_state = self.storage.get_signal_state(ticker)
-            if prev_state is None:
-                state = SignalState(
-                    ticker=ticker, signal=new_signal, score=score, category=category,
-                    updated_at=datetime.now(timezone.utc), strength=final_strength,
-                )
-                self.storage.save_signal_state(state)
             return None
-        if new_signal == Signal.SELL and abs(score) < self.min_score:
-            prev_state = self.storage.get_signal_state(ticker)
-            if prev_state is None:
-                state = SignalState(
-                    ticker=ticker, signal=new_signal, score=score, category=category,
-                    updated_at=datetime.now(timezone.utc), strength=final_strength,
-                )
-                self.storage.save_signal_state(state)
+        if new_signal == Signal.SELL and score > -self.min_score:
             return None
 
         # 6. Check require_change on signal
@@ -300,7 +286,7 @@ class SignalEngine:
 
     def scan_region(self, region: str, timeframe: str = "daily") -> list[SignalEvent]:
         """Scan all tickers in a region. Returns list of emitted events."""
-        {"usa": "us", "sweden": "eu", "china": "asia", "india": "asia"}.get(region, "us")
+        # Region is used via get_universe(region.lower()) below
         tickers = get_universe(region.lower())
         events: list[SignalEvent] = []
         for t in tickers:
