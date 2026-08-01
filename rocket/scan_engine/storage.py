@@ -149,8 +149,8 @@ class SignalStorage:
             for r in rows
         ]
 
-    def get_all_subscriptions(self) -> list[SignalState]:
-        """Alias for get_all_states — human-friendly name."""
+    def get_all_tracked_tickers(self) -> list[SignalState]:
+        """Return all tracked ticker states."""
         return self.get_all_states()
 
     def clear_signal_state(self, ticker: str) -> None:
