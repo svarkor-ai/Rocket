@@ -39,7 +39,7 @@ def run_update_cycle(
             try:
                 save_ohlcv(ticker, df, base_dir=data_dir)
                 saved += 1
-            except Exception as e:
+            except Exception:
                 logger.error(f"Failed to save {ticker}")
         counts[region] = saved
         time.sleep(delay_sec)
@@ -54,6 +54,6 @@ def run_cron(data_dir: str, regions: List[str] = None, interval_min: int = 60):
         try:
             counts = run_update_cycle(data_dir, regions)
             logger.info(f"Cron cycle done: {counts}")
-        except Exception as e:
+        except Exception:
             logger.error("Cron cycle failed")
         time.sleep(interval_min * 60)

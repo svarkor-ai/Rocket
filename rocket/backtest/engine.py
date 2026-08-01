@@ -22,7 +22,6 @@ import json
 import logging
 import sqlite3
 import sys
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -150,7 +149,7 @@ class BacktestResult:
         compound = 1.0
         for t in self.trades:
             compound *= (1 + t["return_pct"] / 100)
-        total = (compound - 1) * 100  # % over full period
+        (compound - 1) * 100  # % over full period
         years = self._trading_days / TRADING_DAYS_PER_YEAR
         if years <= 0:
             return 0.0
@@ -763,7 +762,7 @@ def _run_walk_forward(
     # Build a date-to-index map for the full price series
     # We need to find which prices rows belong to each window
     full_dates = [p["date"] for p in prices]
-    full_date_to_idx = {d: i for i, d in enumerate(full_dates)}
+    {d: i for i, d in enumerate(full_dates)}
 
     # We want to slide a test window of walk_test_days across the data.
     # Each window has walk_train_days of history before it.
@@ -788,7 +787,7 @@ def _run_walk_forward(
         # The strategy needs:
         # - prices for the test window (+ some buffer for hold periods)
         # - scan_history for the test window dates
-        test_prices = prices[test_start:test_end]
+        prices[test_start:test_end]
         # Extend prices slightly to account for HOLD_DAYS exits
         hold_buffer = 10  # extra days for hold period exits
         end_idx = min(test_end + hold_buffer, n)

@@ -1,11 +1,9 @@
 """Parameter sensitivity analysis for strategies."""
-import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any
 from .engine import run_backtest
 from .strategy import BaseStrategy
-from .models import BacktestResult, MetricsDict
 
 
 @dataclass

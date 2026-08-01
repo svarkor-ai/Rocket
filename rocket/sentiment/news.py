@@ -1,7 +1,7 @@
 """Fetch news articles using feedparser from Google News RSS."""
 import feedparser
 import logging
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 from .models import NewsArticle
 
@@ -42,6 +42,6 @@ def fetch_news(tickers: List[str], max_articles: int = 10) -> List[NewsArticle]:
                     ticker=ticker,
                 )
                 articles.append(article)
-        except Exception as e:
+        except Exception:
             logger.warning(f"Failed to fetch news for {ticker}")
     return articles

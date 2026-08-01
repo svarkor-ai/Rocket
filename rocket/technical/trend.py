@@ -19,7 +19,7 @@ class EMA9(BaseIndicator):
                 category=SignalCategory.TREND,
                 values={"ema": 0.0, "price": 0.0},
             )
-        alpha = 2 / (self.period + 1)
+        2 / (self.period + 1)
         ema = df['close'].ewm(span=self.period, adjust=False).mean()
         price = self._last(df['close'])
         ema_val = self._last(ema)
@@ -46,7 +46,7 @@ class EMA21(BaseIndicator):
                 category=SignalCategory.TREND,
                 values={"ema": 0.0, "price": 0.0},
             )
-        alpha = 2 / (self.period + 1)
+        2 / (self.period + 1)
         ema = df['close'].ewm(span=self.period, adjust=False).mean()
         price = self._last(df['close'])
         ema_val = self._last(ema)
@@ -73,7 +73,7 @@ class EMA50(BaseIndicator):
                 category=SignalCategory.TREND,
                 values={"ema": 0.0, "price": 0.0},
             )
-        alpha = 2 / (self.period + 1)
+        2 / (self.period + 1)
         ema = df['close'].ewm(span=self.period, adjust=False).mean()
         price = self._last(df['close'])
         ema_val = self._last(ema)
@@ -100,7 +100,7 @@ class EMA200(BaseIndicator):
                 category=SignalCategory.TREND,
                 values={"ema": 0.0, "price": 0.0},
             )
-        alpha = 2 / (self.period + 1)
+        2 / (self.period + 1)
         ema = df['close'].ewm(span=self.period, adjust=False).mean()
         price = self._last(df['close'])
         ema_val = self._last(ema)

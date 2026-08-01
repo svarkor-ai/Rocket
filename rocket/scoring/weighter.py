@@ -1,6 +1,4 @@
 """Weight scoring — combine category scores into RocketScore."""
-import numpy as np
-from typing import List
 from .models import RocketScore, ScoreBreakdown, FilterResult
 from ..technical.models import SignalCategory
 from ..technical.signal_combiner import SignalSummary

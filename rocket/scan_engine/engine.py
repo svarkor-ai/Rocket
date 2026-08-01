@@ -112,7 +112,7 @@ def _apply_strength_hysteresis(
                 return SignalStrength.BULLISH
     else:
         # Transitioning — check if we crossed the IN threshold
-        in_threshold = h[new_strength]["in"]
+        h[new_strength]["in"]
         if new_strength == SignalStrength.VERY_BEARISH:
             if score > -0.55:  # didn't cross into V-Bearish zone
                 return SignalStrength.BEARISH
@@ -300,7 +300,7 @@ class SignalEngine:
 
     def scan_region(self, region: str, timeframe: str = "daily") -> list[SignalEvent]:
         """Scan all tickers in a region. Returns list of emitted events."""
-        keys = {"usa": "us", "sweden": "eu", "china": "asia", "india": "asia"}.get(region, "us")
+        {"usa": "us", "sweden": "eu", "china": "asia", "india": "asia"}.get(region, "us")
         tickers = get_universe(region.lower())
         events: list[SignalEvent] = []
         for t in tickers:
@@ -308,8 +308,8 @@ class SignalEngine:
                 ev = self.scan_ticker(t, timeframe=timeframe)
                 if ev is not None:
                     events.append(ev)
-            except (KeyError, IndexError, ValueError) as e:
+            except (KeyError, IndexError, ValueError):
                 logger.error(f"{t}: scan error (invalid data)")
-            except Exception as e:
+            except Exception:
                 logger.error(f"{t}: scan error")
         return events

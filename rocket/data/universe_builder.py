@@ -13,7 +13,6 @@ import csv
 import json
 import logging
 import re
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -170,7 +169,7 @@ def _load_us_tickers_from_csv() -> set[str]:
             f.write(content)
         logger.info(f"Downloaded US tickers CSV ({len(content)} chars)")
         return _parse_csv_content(content)
-    except Exception as e:
+    except Exception:
         logger.warning("Failed to load US tickers CSV")
         return set()
 
@@ -222,7 +221,7 @@ def _load_tickers_from_local_source(source: dict) -> list[str]:
         else:
             logger.warning(f"Unsupported local source type: {source_type}")
             return []
-    except Exception as e:
+    except Exception:
         logger.warning("Failed to load tickers from {filepath}")
         return []
 
@@ -232,7 +231,7 @@ def _load_tickers_from_csv_file(filepath: Path, ticker_col: int) -> list[str]:
     tickers = set()
     with open(filepath, "r", encoding="utf-8") as f:
         reader = csv.reader(f)
-        header = next(reader, None)  # Skip header row
+        next(reader, None)  # Skip header row
         for row in reader:
             if ticker_col < len(row):
                 cell = row[ticker_col].strip().upper()
@@ -391,7 +390,7 @@ def _extract_tickers_from_wikipedia(page_name: str) -> list[str]:
         else:
             logger.warning(f"Wikipedia fetch failed for {page_name}")
         return []
-    except Exception as e:
+    except Exception:
         logger.warning(f"Wikipedia fetch failed for {page_name}")
         return []
 

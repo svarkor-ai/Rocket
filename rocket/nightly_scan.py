@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from rocket.data.fetcher import fetch_ohlcv
 from rocket.data.models import TickerInfo, Region
-from rocket.data.universe import get_universe, get_region_count
+from rocket.data.universe import get_universe
 from rocket.scoring.rocket_score import compute_rocket_score
 from rocket.technical.signal_combiner import SignalSummary
 from rocket.technical.models import Signal, SignalCategory

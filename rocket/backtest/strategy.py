@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 
 
 class BaseStrategy(ABC):
@@ -108,8 +108,8 @@ class RocketComboStrategy(BaseStrategy):
             return {"action": "HOLD"}
 
         close = df['close']
-        high = df.get('high', close)
-        low = df.get('low', close)
+        df.get('high', close)
+        df.get('low', close)
 
         # RSI
         delta = close.diff()

@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from telegram import Bot
 
@@ -297,7 +296,7 @@ async def send_notification_batch(
     if not events:
         return
 
-    now = datetime.now(timezone.utc)
+    datetime.now(timezone.utc)
     lines = ["📊 *Portfolio Update:*\\n"]
     sent_count = 0
 

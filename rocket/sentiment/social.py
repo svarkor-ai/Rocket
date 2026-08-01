@@ -4,7 +4,7 @@ Falls back to RSS-based scraping when OAuth credentials are not available.
 """
 import logging
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict
 from .models import SocialSentiment
 from .reddit_auth import RedditSession
 
@@ -48,7 +48,7 @@ def _try_rss_fallback(ticker: str, subreddits: List[str]) -> List[str]:
         import feedparser
     except ImportError:
         return []
-    
+
     all_posts = []
     for sub in subreddits:
         try:
@@ -62,9 +62,9 @@ def _try_rss_fallback(ticker: str, subreddits: List[str]) -> List[str]:
                 if ticker.upper().replace('.', '') in title.upper() or \
                    ticker.upper() in title.upper():
                     all_posts.append(f"{title} {entry.get('summary', '')[:200]}")
-        except Exception as e:
+        except Exception:
             logger.warning(f"RSS search failed for {ticker} in {sub}")
-    
+
     return all_posts
 
 
@@ -85,12 +85,12 @@ def fetch_reddit_sentiment(
             "r/gamestop", "r/superstonk", "r/wallstreetbets",
             "r/sweconomy", "r/swedstocks",
         ]
-    
+
     results = {}
-    
+
     for ticker in tickers:
         all_posts = []
-        
+
         # Try OAuth first, fallback to RSS
         if session is not None:
             for sub in subreddits:
@@ -113,13 +113,13 @@ def fetch_reddit_sentiment(
                                     all_posts.append(
                                         f"{title} — score:{child.get('score', 0)}"
                                     )
-                except Exception as e:
+                except Exception:
                     logger.warning(f"Reddit OAuth search failed for {ticker} in {sub}")
                     continue
         else:
             # RSS fallback
             all_posts = _try_rss_fallback(ticker, subreddits)
-        
+
         # Analyze posts
         counts = _analyze_posts(all_posts)
         total = counts["positive"] + counts["negative"]
@@ -127,7 +127,7 @@ def fetch_reddit_sentiment(
             score = (counts["positive"] - counts["negative"]) / total
         else:
             score = 0.0
-        
+
         results[ticker] = SocialSentiment(
             ticker=ticker,
             platform="reddit",
@@ -135,7 +135,7 @@ def fetch_reddit_sentiment(
             mention_count=len(all_posts),
             posts=all_posts[:10],
         )
-    
+
     return results
 
 
@@ -152,9 +152,9 @@ def fetch_subreddit_activity(
         subreddits = [
             "r/gamestop", "r/superstonk", "r/wallstreetbets",
         ]
-    
+
     results = {}
-    
+
     for sub in subreddits:
         sub_name = sub.replace('r/', '')
         try:
@@ -169,7 +169,7 @@ def fetch_subreddit_activity(
                     children = data['data'].get('children', [])
                     top_posts = []
                     tickers_mentioned = {}
-                    
+
                     for child in children:
                         if isinstance(child, dict):
                             d = child.get('data', {})
@@ -182,12 +182,12 @@ def fetch_subreddit_activity(
                                 'downs': d.get('downs', 0),
                                 'num_comments': d.get('num_comments', 0),
                             })
-                            
+
                             # Extract ticker symbols from title
                             found_tickers = re.findall(r'\b[A-Z]{1,5}\b', title)
                             for t in found_tickers:
                                 tickers_mentioned[t] = tickers_mentioned.get(t, 0) + 1
-                    
+
                     results[sub] = {
                         'top_posts': top_posts[:10],
                         'trending_tickers': dict(
@@ -199,7 +199,7 @@ def fetch_subreddit_activity(
         except Exception as e:
             logger.warning(f"Reddit activity failed for {sub}")
             results[sub] = {'error': str(e)}
-    
+
     return results
 
 
@@ -215,13 +215,13 @@ def monitor_user_activity(
     """
     if subreddits is None:
         subreddits = ["r/superstonk", "r/gamestop", "r/wallstreetbets"]
-    
+
     user_activity = {
         'username': username,
         'posts': [],
         'total_score': 0,
     }
-    
+
     for sub in subreddits:
         try:
             if session is not None:
@@ -248,13 +248,13 @@ def monitor_user_activity(
             else:
                 # RSS fallback — limited user search
                 logger.info(f"OAuth not available, skipping user {username} search")
-        except Exception as e:
+        except Exception:
             logger.warning(f"User monitor failed for {username} in {sub}")
-    
+
     user_activity['posts'] = sorted(
         user_activity['posts'],
         key=lambda x: x['score'],
         reverse=True,
     )[:20]
-    
+
     return user_activity
