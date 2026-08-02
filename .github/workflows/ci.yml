@@ -41,7 +41,7 @@ jobs:
         # Stop the build if there are Python syntax errors or undefined names
         flake8 rocket/ --count --select=E9,F63,F7,F82 --show-source --statistics
         # Exit-zero treats all errors as warnings
-        flake8 rocket/ --count --max-complexity=10 --max-line-length=127 --statistics --extend-exclude=__pycache__,venv
+        flake8 rocket/ --count --max-complexity=10 --max-line-length=127 --statistics --extend-exclude=__pycache__,venv --exit-zero
 
     - name: Run tests with pytest
       run: |
