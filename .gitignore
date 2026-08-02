@@ -46,4 +46,9 @@ PLAN.md
 teddy_prompt.txt
 
 # Hermes tmp
-.heroku-tmp*
+.hermes-tmp.*
+rocket/data/*.json
+rocket/data/*.csv
+rocket/data/*.log
+rocket/data/*.parquet
+rocket/data/*.pkl
