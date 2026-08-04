@@ -1,34 +1,15 @@
-"""Data models for the Signal Engine."""
-from __future__ import annotations
+"""Data models for the rocket stock scanner."""
 
-from dataclasses import dataclass
-from datetime import datetime
-
-from ..technical.models import Signal, SignalCategory, SignalStrength
+from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass
-class SignalEvent:
-    """Emitted when a signal change (or new signal) is detected."""
+class TickerInfo:
+    """Metadata for a single ticker in the universe."""
     ticker: str
-    prev_signal: Signal
-    new_signal: Signal
-    score: float
-    category: SignalCategory
-    reason: str           # human-readable explanation
-    timestamp: datetime
-    timeframe: str        # "daily" or "intraday"
-    buy_count: int = 0    # number of buy indicators
-    sell_count: int = 0   # number of sell indicators
-    strength: SignalStrength = SignalStrength.HOLD
-
-
-@dataclass
-class SignalState:
-    """Persistent state for a single ticker — used for change detection."""
-    ticker: str
-    signal: Signal
-    score: float
-    category: SignalCategory
-    updated_at: datetime
-    strength: SignalStrength = SignalStrength.HOLD
+    name: Optional[str] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    market_cap: Optional[float] = None
+    region: Optional[str] = None
