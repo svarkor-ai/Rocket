@@ -5,7 +5,9 @@ import os
 
 from ..users.store import UserStore
 
-ADMIN_CHAT_ID: int = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "7228171084"))
+# SECURITY (MC#939): no hardcoded fallback — 0 matches no real Telegram user, so an
+# unset SCAN_PRO_ADMIN_CHAT_ID fails CLOSED (nobody is admin) instead of leaking an id.
+ADMIN_CHAT_ID: int = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
 
 
 async def _check_admin(update, context) -> bool:

@@ -30,7 +30,9 @@ from .commands import (
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("SCAN_PRO_TELEGRAM_BOT_TOKEN", "")
-ADMIN_CHAT_ID = os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "7228171084")
+# SECURITY (MC#939): no hardcoded fallback — the admin chat id is configured ONLY via
+# the SCAN_PRO_ADMIN_CHAT_ID env var (config/scan_pro.env, untracked). Empty => no admin.
+ADMIN_CHAT_ID = os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "")
 
 _user_store: UserStore | None = None
 

@@ -48,7 +48,8 @@ if not BOT_TOKEN:
     load_dotenv('/home/svarkor/.hermes/.env')
     BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 
-ADMIN_CHAT_ID = int(os.environ.get('SCAN_PRO_ADMIN_CHAT_ID', '7228171084'))
+# SECURITY (MC#939): no hardcoded fallback — 0 = unset/fail-closed.
+ADMIN_CHAT_ID = int(os.environ.get('SCAN_PRO_ADMIN_CHAT_ID', '0'))
 
 REGION_MAP = {
     'usa': Region.US, 'sweden': Region.EU, 'norway': Region.EU,

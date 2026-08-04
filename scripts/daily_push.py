@@ -36,7 +36,8 @@ BOT_TOKEN = os.environ.get("SCAN_PRO_TELEGRAM_BOT_TOKEN", "")
 if not BOT_TOKEN:
     load_dotenv(os.path.expanduser("~/.hermes/.env"))
     BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-ADMIN_CHAT_ID = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "7228171084"))
+# SECURITY (MC#939): no hardcoded fallback; 0 = unset, checked at startup below.
+ADMIN_CHAT_ID = int(os.environ.get("SCAN_PRO_ADMIN_CHAT_ID", "0"))
 
 # ---------------------------------------------------------------------------
 # Top ~100 tickers: mega + large cap US + major international
@@ -400,6 +401,11 @@ def main():
     if not BOT_TOKEN:
         print("❌ No Telegram bot token found!", flush=True)
         print("Set SCAN_PRO_TELEGRAM_BOT_TOKEN in config/scan_pro.env", flush=True)
+        sys.exit(1)
+
+    if not ADMIN_CHAT_ID:
+        print("❌ No admin chat id configured!", flush=True)
+        print("Set SCAN_PRO_ADMIN_CHAT_ID in config/scan_pro.env (untracked - NEVER commit it)", flush=True)
         sys.exit(1)
     
     # Scan
