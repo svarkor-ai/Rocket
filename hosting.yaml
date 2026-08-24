@@ -1,0 +1,12 @@
+{
+  "_comment": [
+    "vm106 hosting config for svarkor-ai/rocket -- MC#2317. Strict JSON (no yaml lib; comments only here).",
+    "Dash web app. exec=server.py binds 0.0.0.0:8118 (app.py's own __main__ binds 8050 -- not used by the renderer).",
+    "Needs the pin-fixed requirements.txt (ranged pins + missing dash-bootstrap-components rewritten)."
+  ],
+  "name": "rocket",
+  "type": "service",
+  "root": "apps/rocket",
+  "exec": "server.py",
+  "port": 8118
+}

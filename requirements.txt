@@ -1,5 +1,10 @@
-python-telegram-bot>=20.0
-dash>=2.0.0
+# MC#2317 pin-fix for svarkor-ai/rocket -- exact pins only (vm106 build gate: pkg==version,
+# no ranges/extras/inline-comments; <=20 pins, <=4096 bytes).
+# CHANGES vs repo requirements.txt: python-telegram-bot>=20.0 -> ==21.6 ; dash>=2.0.0 -> ==2.18.1 ;
+# ADDED dash-bootstrap-components==1.6.0 (app.py imports it but it was missing). All pins verified on PyPI.
+python-telegram-bot==21.6
+dash==2.18.1
+dash-bootstrap-components==1.6.0
 plotly==6.8.0
 pandas==3.0.3
 numpy==2.5.1
