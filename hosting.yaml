@@ -1,12 +1,12 @@
 {
   "_comment": [
-    "vm106 hosting config for svarkor-ai/rocket -- MC#2317. Strict JSON (no yaml lib; comments only here).",
-    "Dash web app. exec=server.py binds 0.0.0.0:8118 (app.py's own __main__ binds 8050 -- not used by the renderer).",
-    "Needs the pin-fixed requirements.txt (ranged pins + missing dash-bootstrap-components rewritten)."
+    "vm106 hosting config for svarkor-ai/rocket. Strict JSON (no yaml lib; comments only here).",
+    "type static -> nginx serves <root>/ directly at /rocket/ ; index.html is the entry.",
+    "The deliverable is the read-only demo snapshot (index.html), matching the live page at",
+    "https://sibbamala.com/rocket/. The Dash service (server.py, port 8118) is kept as engine",
+    "source but is NOT the hosted demo; the owner dropped the live/25k-scale rebuild."
   ],
   "name": "rocket",
-  "type": "service",
-  "root": "apps/rocket",
-  "exec": "server.py",
-  "port": 8118
+  "type": "static",
+  "root": "apps/rocket"
 }
