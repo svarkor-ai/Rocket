@@ -6,8 +6,11 @@ venv/
 
 # Secrets (MC#939): real config lives ONLY in untracked env files.
 # The committed template is config/scan_pro.env.example (placeholders only).
+# The engine now lives under source/, so cover both locations.
 config/*.env
 !config/scan_pro.env.example
+source/config/*.env
+!source/config/scan_pro.env.example
 
 # Python cache
 __pycache__/
@@ -23,7 +26,7 @@ build/
 .coverage
 htmlcov/
 
-# Data files (local, not tracked)
+# Data files (local, not tracked) -- covered at repo root AND under source/ (engine moved there)
 data/*.parquet
 data/*.pkl
 data/tickers/
@@ -33,6 +36,14 @@ data/*.db
 data/*.csv
 data/*.json
 logs/
+source/data/*.parquet
+source/data/*.pkl
+source/data/tickers/
+source/data/ohlcv/
+source/data/*.db
+source/data/*.csv
+source/data/*.json
+source/logs/
 
 # IDE
 .vscode/
@@ -50,5 +61,6 @@ LEDGER.md
 PLAN.md
 teddy_prompt.txt
 
-# Hermes tmp
+# Hermes tmp (fixed pattern: the stray files were named .hermes-tmp.*, removed from the served root)
 .heroku-tmp*
+.hermes-tmp*

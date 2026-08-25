@@ -3,8 +3,13 @@
     "vm106 hosting config for svarkor-ai/rocket. Strict JSON (no yaml lib; comments only here).",
     "type static -> nginx serves <root>/ directly at /rocket/ ; index.html is the entry.",
     "The deliverable is the read-only demo snapshot (index.html), matching the live page at",
-    "https://sibbamala.com/rocket/. The Dash service (server.py, port 8118) is kept as engine",
-    "source but is NOT the hosted demo; the owner dropped the live/25k-scale rebuild."
+    "https://sibbamala.com/rocket/. The owner dropped the live/25k-scale rebuild.",
+    "RECONCILER-SAFE LAYOUT: the served content is ONLY the self-contained index.html at the",
+    "repo root (mirrored to <monorepo>/apps/rocket/, hence root=apps/rocket). The FULL Python",
+    "scan engine (app.py, server.py, rocket/, data_fetcher/, tests/, requirements.txt, ...) lives",
+    "under source/ -- versioned but NOT served, mirroring the hosting monorepo's",
+    "'Files under source/ are versioned but NOT served' convention. No *.py is reachable under",
+    "the served root; the static alias can never expose engine source."
   ],
   "name": "rocket",
   "type": "static",

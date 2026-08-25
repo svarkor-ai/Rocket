@@ -19,7 +19,7 @@ them into a single evidence-weighted score:
 The indicators vote by family; a confidence and a risk multiplier are applied, and the
 result is an **Overall score (0–100)** plus a **BUY / HOLD / SELL** signal per ticker, with
 per-category sub-scores for Momentum, Trend, Volatility and Volume. The full list lives in
-`rocket/scoring/rocket_score.py` (`INDICATORS`).
+`source/rocket/scoring/rocket_score.py` (`INDICATORS`).
 
 ## The hosted page is a read-only demo snapshot
 
@@ -39,10 +39,18 @@ data, global coverage, or a full-universe scan.
 
 ## Repository layout
 
-- `app.py`, `server.py` — the Dash dashboard (engine UI; `server.py` is the hosting entrypoint)
-- `rocket/scoring/` — the Rocket score (`rocket_score.py`, weighting, risk, confidence)
-- `rocket/technical/` — the 29 indicator implementations
-- `rocket/data/`, `data_fetcher/` — data fetch and storage
-- `rocket/telegram_bot/`, `rocket/backtest/`, `rocket/scan_engine/` — bot, backtests, scans
-- `index.html` — the hosted read-only demo snapshot
-- `hosting.yaml` — deployment manifest (static demo)
+The repo root holds **only the served demo**; the entire Python engine lives under `source/`
+(versioned but **not** served — see `hosting.yaml`), so the static hosting alias can never
+expose engine source:
+
+- `index.html` — the hosted read-only demo snapshot (the only served artifact)
+- `hosting.yaml` — deployment manifest (static demo; `root: apps/rocket`)
+- `source/` — the full scan engine (not served):
+  - `source/app.py`, `source/server.py` — the Dash dashboard (engine UI; `server.py` is the hosting entrypoint)
+  - `source/rocket/scoring/` — the Rocket score (`rocket_score.py`, weighting, risk, confidence)
+  - `source/rocket/technical/` — the 29 indicator implementations
+  - `source/rocket/dataquality/` — split-adjust, outlier detection, cleaning pipeline, position sizing
+  - `source/rocket/data/`, `source/data_fetcher/` — data fetch and storage
+  - `source/rocket/telegram_bot/`, `source/rocket/backtest/`, `source/rocket/scan_engine/` — bot, backtests, scans
+  - `source/rocket/scoring/stocktwits.py` — StockTwits social-sentiment fetcher
+  - `source/tests/`, `source/requirements.txt`, `source/ARCHITECTURE.md` — tests, pins, architecture
