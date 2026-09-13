@@ -1,19 +1,25 @@
-# MC#2317 pin-fix for svarkor-ai/rocket -- exact pins only (vm106 build gate: pkg==version,
-# no ranges/extras/inline-comments; <=20 pins, <=4096 bytes).
-# CHANGES vs repo requirements.txt: python-telegram-bot>=20.0 -> ==21.6 ; dash>=2.0.0 -> ==2.18.1 ;
-# ADDED dash-bootstrap-components==1.6.0 (app.py imports it but it was missing). All pins verified on PyPI.
-python-telegram-bot==21.6
-dash==2.18.1
-dash-bootstrap-components==1.6.0
-plotly==6.8.0
-pandas==3.0.3
-numpy==2.5.1
-yfinance==1.5.1
-pyarrow==24.0.0
-pydantic==2.13.4
-apscheduler==3.11.3
-feedparser==6.0.12
-requests==2.34.2
-click==8.4.2
-python-dotenv==1.2.2
-tabulate==0.10.0
+# Testlucka T2 (987.6) requirements fix — Test-sviten grön out-of-the-box.
+# FIXED vs older file: added pytest/httpx/beautifulsoup4 (tests import them but they were
+# missing -> suite demanded manual pip-install). Fixed numpy pin: ==2.5.1 does NOT exist on
+# PyPI (latest 2.4.6) -> switched to compatible range. Aligned ranges to a normal py3.11 env
+# that resolves and passes `pip check` (DoD: fresh venv -> pip install -r -> pytest -q -> "0 failed";
+# pip check -> "No broken requirements found"). Switched from exact pins to compatible
+# upper/lower bounds per Testlucka T2 brief (don't freeze exotic exact versions).
+pytest>=8,<10
+numpy>=2.0,<2.5
+pandas>=2.2,<3.1
+pyarrow>=17,<26
+plotly>=6,<8
+python-telegram-bot>=21,<23
+feedparser>=6.0,<7
+httpx>=0.27,<1
+beautifulsoup4>=4.12,<5
+yfinance>=0.2,<2
+requests>=2.28,<3
+pydantic>=2,<3
+dash>=2.14,<3
+dash-bootstrap-components>=1.4,<2
+apscheduler>=3.10,<4
+click>=8.1,<9
+python-dotenv>=1.0,<2
+tabulate>=0.9,<1

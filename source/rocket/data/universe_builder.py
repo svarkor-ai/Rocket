@@ -522,10 +522,31 @@ def _build_universe(force_refresh: bool = False) -> dict[str, list[str]]:
             universe[region_key] = list(fallback[region_key])
             logger.info(f"  {region_key}: {len(universe[region_key])} tickers (embedded fallback)")
 
+    # --- M4/M5: the generated regions are AUTHORITATIVE, never overridden ---
+    # The WIKI/local scraping above can leave a partially-scraped region (e.g. a
+    # 20..80-symbol Wikipedia table for sweden) that would otherwise shadow the
+    # full reshaped list from the M1/M2 raw files. DESIGN C1/I1 pins the reshaped
+    # region lists as the source for these M4-managed regions, so they must win
+    # unconditionally (a partial scrape is the exact bare-number/junk defect the
+    # chain exists to remove — PLAN §1). USA/UK/AU/CA/CH stay untouched.
+    _MANAGED = {"sweden", "norway", "denmark", "finland", "germany", "france",
+                "japan", "hongkong", "china", "india", "korea"}
+    for _reg in list(universe):
+        if _reg in _MANAGED:
+            universe[_reg] = list(fallback[_reg]) if _reg in fallback else []
+    for _reg in _MANAGED:  # ensure every managed region key exists in the cache
+        if _reg not in universe and _reg in fallback:
+            universe[_reg] = list(fallback[_reg])
+
     # --- Backward-compatibility: international = all non-US regions combined ---
     intl = set()
     for region_key in WIKI_PAGES:
         intl.update(universe.get(region_key, []))
+    # include the M4 Nordic/Europe generated regions in the non-US aggregate too,
+    # so `international` reflects the full reshaped universe (norway/denmark/
+    # finland are not WIKI_PAGES keys).
+    for _reg in _MANAGED:
+        intl.update(universe.get(_reg, []))
     universe["international"] = sorted(intl)
     logger.info(f"  International (combined non-US): {len(universe['international'])} tickers")
 
@@ -605,11 +626,88 @@ def get_total_count() -> int:
     return len(get_all_tickers())
 
 
+def _load_generated_region_lists() -> dict[str, list[str]]:
+    """Load the M4-managed region lists from the reconciled manifest (D4) and,
+    for any region absent there (currently only norway), reconcile the raw file
+    via the extended normalizer (symbols.SymbolNormalizer + the M3 rule table).
+
+    Returns dict region_key -> list of canonical Yahoo tickers, each member of
+    DOD_SUFFIXES. This is the M4 replacement for the hardcoded sweden/thin
+    __TICKERS literals (I1). The normalizer / rule table is reused, not forked
+    (I2, I6). See DESIGN C1, C1b, D4; card 947.5.
+    """
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _DATA_DIR = _Path("/srv/workspace/rocket-region-universe/data")
+    _MANIFEST = _DATA_DIR / "reconciled_manifest.json"
+
+    # ---- reuse the M3 rule table + reconcile driver, do not re-implement ----
+    # (coding-discipline / reuse-research-gate STEP 0: the reconcile logic is
+    #  the sibling module reconcile_m3.py, not something to rewrite here.)
+    _NORWAY_FILE = _DATA_DIR / "norway_raw.txt"
+    if str(_DATA_DIR) not in _sys.path:
+        _sys.path.insert(0, str(_DATA_DIR))
+    from reconcile_m3 import (  # noqa: E402
+        reconcile,
+        load_raw_rows,
+        _parse_nordic_lines,
+    )
+
+    lists: dict[str, list[str]] = {}
+
+    # (a) regions present in the manifest -> take already-canonical ok yahoo.
+    if _MANIFEST.exists():
+        manifest = json.loads(_MANIFEST.read_text())
+        by_region: dict[str, list[str]] = {}
+        for row in manifest:
+            if row["status"] == "ok" and row["yahoo"]:
+                by_region.setdefault(row["region"], []).append(row["yahoo"])
+        for reg, syms in by_region.items():
+            lists[reg] = sorted(set(syms))
+
+    # (b) M4-managed Nordic/Europe regions that M3's manifest does NOT cover.
+    #     As of this card that is only NORWAY: norway_raw.txt landed after M3's
+    #     manifest was written, so reconcile_m3.load_raw_rows() ignores it. Reuse
+    #     the SAME reconcile driver + Nordic TSV parser (nothing re-implemented).
+    managed_raw = {"sweden", "norway", "denmark", "finland", "germany", "france"}
+    raw_rows: list[tuple[str, str]] = []
+    # every managed region already streamed by reconcile_m3.load_raw_rows()
+    for sym, region in load_raw_rows():
+        if region in managed_raw:
+            raw_rows.append((sym, region))
+    # norway (absent from reconcile_m3.load_raw_rows): same TSV format
+    if _NORWAY_FILE.exists():
+        for sym in _parse_nordic_lines(_NORWAY_FILE.open()):
+            raw_rows.append((sym, "norway"))
+
+    reconciled = reconcile(raw_rows)
+    for row in reconciled:
+        if row["status"] == "ok" and row["yahoo"] and row["region"] in managed_raw:
+            lists.setdefault(row["region"], []).append(row["yahoo"])
+    for reg in managed_raw:
+        if reg in lists:
+            lists[reg] = sorted(set(lists[reg]))
+
+    # (c) harden: sanitize every generated symbol against the DoD regex.
+    dod_re = re.compile(r"^[A-Z0-9.\-]+\.(ST|OL|CO|HE|PA|DE|T|HK|KS|NS|BO)$")
+    clean: dict[str, list[str]] = {}
+    for reg, syms in lists.items():
+        clean_syms = sorted({s for s in syms if dod_re.match(s)})
+        if clean_syms:
+            clean[reg] = clean_syms
+    return clean
+
+
 def _build_embedded_fallback() -> dict[str, list[str]]:
     """Fallback universe builder with embedded lists if Wikipedia fails.
 
     This provides ~1,200+ tickers as a minimum viable universe,
     covering all regions instead of just usa + international.
+
+    The sweden/thin regions (M4 scope) are GENERATED from the M1/M2 raw files
+    via the extended normalizer -- NOT hardcoded (I1). USA/UK/AU/CA/CH remain
+    untouched embedded lists (out of M4 scope).
     """
     # USA — S&P 500 (core holdings) + major tech
     USA_TICKERS = [
@@ -661,18 +759,6 @@ def _build_embedded_fallback() -> dict[str, list[str]]:
         "ZM", "ZS", "ZM", "ZS", "ZS", "ZS",
     ]
 
-    # Sweden / Scandinavia
-    SWEDEN_TICKERS = [
-        "ABB.ST", "ADV.ST", "ATC.ST", "BEN.ST", "CARB.ST", "CLAB.ST",
-        "CONC.ST", "ESS.ST", "HM.ST", "ITUB.ST", "KFST.ST", "MUB.ST",
-        "NPI.ST", "OQA.ST", "PEO.ST", "SAB.ST", "SEB.ST", "SAND.ST",
-        "SSAB.ST", "SWED-A.ST", "SWED-B.ST", "SVA.ST", "Telia.ST",
-        "VOLV-B.ST", "ERIC-B.ST", "ALFA.ST", "HMV-B.ST", "SAND.ST",
-        "Investor-B.ST", "IFU.AB",
-        "ESS.AB", "SAM-B.ST", "SEK-A.ST", "KIR.BK", "INDU-A.ST",
-        "SEB-A.ST", "HM-B.ST", "IFU-A.ST", "S395.B", "S396.B",
-    ]
-
     # UK
     UK_TICKERS = [
         "BP.L", "SHEL.L", "GSK.L", "AZN.L", "ULVR.L", "DGE.L",
@@ -688,84 +774,20 @@ def _build_embedded_fallback() -> dict[str, list[str]]:
         "SDR.L", "TSCO.L", "WTB.L", "WEIR.L", "WN.L",
     ]
 
-    # Germany
-    GERMANY_TICKERS = [
-        "SIE.DE", "ALV.DE", "MBG.DE", "BAS.DE", "DTE.DE", "BMW.DE",
-        "VNA.DE", "MUV2.DE", "DB1.DE", "FRE.DE", "HEN3.DE",
-        "IFX.DE", "LIN.DE", "MRK.DE", "CON.DE", "DBK.DE",
-        "PUM.DE", "BEI.DE", "ZAL.DE", "SY1.DE", "FME.DE",
-        "HEI.DE", "MTX.DE", "KRA.DE", "BSF.DE", "WAZ.MU",
-    ]
-
     # France
-    FRANCE_TICKERS = [
-        "OR.PA", "SAN.PA", "TTE.PA", "BN.PA", "AIR.PA", "AI.PA",
-        "ACA.PA", "BNP.PA", "CAP.PA", "EN.PA", "EL.PA",
-        "KER.PA", "MC.PA", "MNOP.PA", "RI.PA", "SAF.PA",
-        "SGO.PA", "SU.PA", "VIE.PA", "STL.PA", "DSY.PA",
-        "CS.PA", "BVI.PA", "HO.PA", "GO.PA", "LEH.PA",
-    ]
+    # (france list now GENERATED from france_raw.txt via normalizer — I1)
 
     # Japan (Nikkei 225 + major TSE stocks)
-    JAPAN_TICKERS = [
-        "7203.T", "6758.T", "9984.T", "6861.T", "8306.T",
-        "6954.T", "8035.T", "4519.T", "6098.T", "9432.T",
-        "7974.T", "4689.T", "9433.T", "9735.T", "4704.T",
-        "6920.T", "6367.T", "8058.T", "9983.T", "4063.T",
-        "6594.T", "7751.T", "6702.T", "6841.T", "6981.T",
-        "6301.T", "6302.T", "6501.T", "6503.T", "6504.T",
-        "6506.T", "6591.T", "6752.T", "6753.T", "6757.T",
-        "6762.T", "6857.T", "6902.T", "7259.T", "7261.T",
-        "7267.T", "7269.T", "7731.T", "7733.T", "7752.T",
-        "7754.T", "8001.T", "8002.T", "8003.T", "8015.T",
-        "8031.T", "8053.T", "8059.T", "8252.T", "8267.T",
-        "8410.T", "8630.T", "8697.T", "8750.T", "9001.T",
-        "9006.T", "9020.T", "9021.T", "9101.T", "9104.T",
-        "9301.T", "9304.T", "9501.T", "9502.T", "9531.T",
-        "9532.T", "9613.T", "7735.T", "6976.T", "4502.T",
-        "4503.T", "4523.T", "4541.T", "4567.T", "4578.T",
-        "4661.T",
-    ]
+    # (japan list now GENERATED from asia_raw.txt via normalizer — I1)
 
     # Hong Kong (Hang Seng constituents)
-    HONGKONG_TICKERS = [
-        "0005.HK", "0006.HK", "0011.HK", "0012.HK", "0016.HK",
-        "0017.HK", "0027.HK", "0066.HK", "0267.HK", "0288.HK",
-        "0291.HK", "0388.HK", "0522.HK", "0688.HK", "0700.HK",
-        "0762.HK", "0883.HK", "0914.HK", "0939.HK", "0941.HK",
-        "0968.HK", "0998.HK", "1038.HK", "1088.HK", "1093.HK",
-        "1109.HK", "1171.HK", "1186.HK", "1211.HK", "1299.HK",
-        "1339.HK", "1398.HK", "1766.HK", "1918.HK", "1997.HK",
-        "2020.HK", "2313.HK", "2319.HK", "2380.HK", "2601.HK",
-        "2688.HK", "2888.HK", "3311.HK", "3328.HK", "3329.HK",
-        "3383.HK", "6060.HK", "6690.HK", "9868.HK", "9901.HK",
-    ]
+    # (hongkong list now GENERATED from asia_raw.txt via normalizer — I1)
 
     # China (A-shares: Shanghai SS + Shenzhen SZ + HK-listed Chinese names)
-    CHINA_TICKERS = [
-        # A-shares
-        "600519.SS", "601318.SS", "600036.SS", "601398.SS", "000858.SZ",
-        "600276.SS", "300750.SZ", "601012.SS", "000568.SZ", "600900.SS",
-        "601888.SS", "000333.SZ", "600030.SS", "601288.SS", "000001.SZ",
-        "601166.SS", "600309.SS", "600887.SS", "000651.SZ", "601336.SS",
-        "601668.SS", "601816.SS", "002714.SZ", "000002.SZ", "600048.SS",
-        "601601.SS", "000538.SZ", "601088.SS", "002142.SZ", "600000.SS",
-        "002304.SZ", "002475.SZ", "000725.SZ", "002352.SZ", "002594.SZ",
-        "600346.SS", "601211.SS", "601607.SS", "600809.SS", "601328.SS",
-        # HK-listed Chinese tech/consumers
-        "3690.HK", "9888.HK", "9999.HK", "6186.HK", "1359.HK",
-        "1024.HK", "9633.HK", "2150.HK", "6185.HK",
-    ]
+    # (china list now GENERATED from asia_raw.txt via normalizer — I1)
 
     # India
-    INDIA_TICKERS = [
-        "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
-        "HINDUNILVR.NS", "SBIN.NS", "BHARTIARTL.NS", "ITC.NS", "KOTAKBANK.NS",
-        "LT.NS", "AXISBANK.NS", "HCLTECH.NS", "ASIANPAINT.NS", "MARUTI.NS",
-        "TATAMOTORS.NS", "TATASTEEL.NS", "WIPRO.NS", "ULTRACEMCO.NS",
-        "BAJFINANCE.NS", "NTPC.NS", "POWERGRID.NS", "ONGC.NS", "SUNPHARMA.NS",
-        "TITAN.NS", "TECHM.NS", "M&M.NS", "HDFCLIFE.NS", "JSWSTEEL.NS",
-    ]
+    # (india list now GENERATED from asia_raw.txt via normalizer — I1)
 
     # Australia
     AUSTRALIA_TICKERS = [
@@ -797,39 +819,28 @@ def _build_embedded_fallback() -> dict[str, list[str]]:
     ]
 
     # South Korea (KOSPI + KOSDAQ major)
-    KOREA_TICKERS = [
-        "005930.KS", "000660.KS", "035420.KS", "051910.KS",
-        "006400.KS", "207940.KS", "373220.KS", "068270.KS",
-        "005380.KS", "035720.KS", "000100.KS", "000270.KS",
-        "012340.KS", "018260.KS", "028260.KS", "003550.KS",
-        "006840.KS", "015760.KS", "018230.KS", "033780.KS",
-        "034020.KS", "046730.KS", "051900.KS", "066570.KS",
-        "086740.KS", "096770.KS", "105560.KS", "114440.KS",
-        "128560.KS", "139480.KS", "141480.KS", "161390.KS",
-        "176640.KS", "188140.KS", "191770.KS", "207220.KS",
-        "216040.KS", "241560.KS", "250660.KS", "263730.KS",
-        "279970.KS", "291210.KS", "301630.KS", "313260.KS",
-        "321820.KS", "335880.KS", "353770.KS", "402820.KS",
-    ]
+    # (korea list now GENERATED from asia_raw.txt via normalizer — I1)
+
+    generated = _load_generated_region_lists()
 
     return {
         "usa": sorted(set(USA_TICKERS)),
-        "sweden": sorted(set(SWEDEN_TICKERS)),
         "uk": sorted(set(UK_TICKERS)),
-        "germany": sorted(set(GERMANY_TICKERS)),
-        "france": sorted(set(FRANCE_TICKERS)),
-        "japan": sorted(set(JAPAN_TICKERS)),
-        "hongkong": sorted(set(HONGKONG_TICKERS)),
-        "china": sorted(set(CHINA_TICKERS)),
-        "india": sorted(set(INDIA_TICKERS)),
         "australia": sorted(set(AUSTRALIA_TICKERS)),
         "canada": sorted(set(CANADA_TICKERS)),
         "switzerland": sorted(set(SWITZERLAND_TICKERS)),
-        "korea": sorted(set(KOREA_TICKERS)),
-        "international": sorted(set(
-            SWEDEN_TICKERS + UK_TICKERS + GERMANY_TICKERS +
-            FRANCE_TICKERS + JAPAN_TICKERS + HONGKONG_TICKERS +
-            CHINA_TICKERS + INDIA_TICKERS + AUSTRALIA_TICKERS +
-            CANADA_TICKERS + SWITZERLAND_TICKERS + KOREA_TICKERS
-        )),
+        # M4-generated regions (from raw files via normalizer) replace the
+        # hardcoded sweden/thin literals (I1). Each is DoD-sanitized.
+        **{reg: sorted(set(generated.get(reg, [])))
+           for reg in ("sweden", "norway", "denmark", "finland",
+                       "germany", "france", "japan", "hongkong",
+                       "china", "india", "korea")},
+        # international = all non-usa regions combined (backward compatible)
+        "international": sorted(set().union(
+            *(v for k, v in {
+                "uk": UK_TICKERS, "australia": AUSTRALIA_TICKERS,
+                "canada": CANADA_TICKERS, "switzerland": SWITZERLAND_TICKERS,
+                **generated,
+            }.items() if k != "usa"))
+        ),
     }
