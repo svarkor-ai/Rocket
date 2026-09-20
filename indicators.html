@@ -1,0 +1,161 @@
+<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Rocket — Så fungerar poängen (indikatorer och vikter)</title><style>
+:root {
+  --bg:#0f1115; --surface:#181b21; --surface2:#1f232c;
+  --text:#e8eaed; --muted:#9aa0a8; --border:#2a2e36;
+  --accent:#4f8cff;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-6:24px; --space-8:32px; --radius:8px;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+.wrap { max-width:1080px; margin:0 auto; padding:var(--space-6) var(--space-4); }
+header.page { margin-bottom:var(--space-6); }
+header.page h1 { font-size:26px; margin:0 0 var(--space-1); }
+header.page .sub { color:var(--muted); font-size:13px; }
+h2 { font-size:19px; margin:var(--space-8) 0 var(--space-3); }
+h3 { font-size:16px; margin:var(--space-6) 0 var(--space-2); }
+p, li { max-width:75ch; }
+.muted { color:var(--muted); }
+.cards { display:flex; flex-wrap:wrap; gap:var(--space-4); margin:var(--space-4) 0 var(--space-6); }
+.card { flex:1 1 150px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-1); }
+.card .k { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+.card .v { font-size:20px; font-weight:700; }
+.weightbar { display:flex; height:34px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); margin:var(--space-3) 0; font-size:12px; font-weight:600; }
+.weightbar div { display:flex; align-items:center; justify-content:center; color:#0f1115; }
+.w-mom { flex:40; background:#4f8cff; }
+.w-tre { flex:30; background:#7fb2ff; }
+.w-sta { flex:20; background:#b3cdff; }
+.w-liq { flex:10; background:#dbe7ff; }
+code { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:13px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+.formula { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:var(--radius); padding:var(--space-3) var(--space-4); margin:var(--space-2) 0 var(--space-4); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; overflow-x:auto; white-space:pre; }
+.note { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space-3) var(--space-4); margin:var(--space-3) 0; color:var(--muted); font-size:14px; }
+.table-wrap { overflow-x:auto; }
+table.board { width:100%; border-collapse:collapse; min-width:620px; }
+table.board th, table.board td { text-align:left; padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--border); font-size:14px; }
+table.board th { color:var(--muted); font-weight:600; background:var(--surface2); }
+td { font-variant-numeric:tabular-nums; }
+.provenance { margin-top:var(--space-8); padding:var(--space-4) var(--space-6); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); display:flex; flex-wrap:wrap; gap:var(--space-3) var(--space-6); align-items:center; }
+.p-badge { background:var(--surface2); border:1px solid var(--accent); color:var(--accent); padding:var(--space-1) var(--space-2); border-radius:var(--radius); font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+.p-meta { display:flex; flex-wrap:wrap; gap:var(--space-2) var(--space-4); font-size:13px; color:var(--muted); }
+.rocket-nav{display:flex;flex-wrap:wrap;gap:var(--space-2);margin:0 0 var(--space-6);padding:var(--space-2);border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);}
+.rocket-nav a{color:var(--muted);text-decoration:none;padding:var(--space-2) var(--space-3);border-radius:var(--radius);font-size:14px;}
+.rocket-nav a:hover{color:var(--text);}
+.rocket-nav a.active{color:var(--accent);background:var(--surface2);font-weight:600;border:1px solid var(--border);}
+@media (max-width:640px) { header.page h1 { font-size:21px; } }
+</style></head><body><div class="wrap">
+<nav class="rocket-nav" aria-label="Huvudnavigering"><a href="index.html">Top 25</a><a href="region-top25.html">Regioner</a><a href="indicators.html" class="active" aria-current="page">Indikatorer</a><a href="portfolio.html">Portfolio</a></nav>
+
+<header class="page">
+  <h1>Så fungerar poängen — indikatorer och vikter</h1>
+  <div class="sub">Förklaring av Rockets score 0–100, skriven direkt mot scorerns faktiska kod (685.3 / DI3) · verifierad 2026-08-31</div>
+</header>
+
+<p>Rocket ger varje aktie ett <strong>composite score mellan 0 och 100</strong>. Poängen byggs av fyra
+del-poäng (subscores) som var och en är en siffra mellan 0 och 1, viktade samman till 100.
+Det finns inga hemliga komponenter: det nedan är allt som scorern använder.</p>
+
+<div class="cards">
+  <div class="card"><span class="k">Totalt</span><span class="v">0–100</span></div>
+  <div class="card"><span class="k">Momentum</span><span class="v">40 %</span></div>
+  <div class="card"><span class="k">Trend</span><span class="v">30 %</span></div>
+  <div class="card"><span class="k">Stabilitet</span><span class="v">20 %</span></div>
+  <div class="card"><span class="k">Likviditet</span><span class="v">10 %</span></div>
+</div>
+
+<div class="weightbar" aria-label="Viktfördelning">
+  <div class="w-mom">Momentum 40</div>
+  <div class="w-tre">Trend 30</div>
+  <div class="w-sta">Stabilitet 20</div>
+  <div class="w-liq">Likviditet 10</div>
+</div>
+
+<div class="formula">score = 40·momentum + 30·trend + 20·stabilitet + 10·likviditet   (avrundas till 4 decimaler)</div>
+
+<h2>1. Momentum — vikt 40 (störst)</h2>
+<p><strong>Vad som mäts:</strong> hur mycket kursen rört sig över hela dataperioden —
+totalavkastningen från första till sista stängningskurs.</p>
+<p><strong>Varför:</strong> stark historisk uppgång är den enskilt tyngande signalen i modellen.</p>
+<p><strong>Hur den räknas:</strong> periodavkastningen <code>(sista_stäng − första_stäng) / första_stäng</code>
+klips till intervallet −2 … +2 och skalas linjärt: −2 ger del-poäng 0, oförändrad kurs ger 0,5,
++2 (dubblering) ger 1. Saknas avkastning blir del-poängen 0.</p>
+<div class="formula">period_ret = (close_sista − close_första) / close_första
+momentum  = klipp( 0.5 + period_ret/4 ), period_ret klips först till [−2, +2]</div>
+
+<h2>2. Trend — vikt 30</h2>
+<p><strong>Vad som mäts:</strong> om de 20 senaste dagarna ligger över eller under medelkursen för
+resta perioden.</p>
+<p><strong>Varför:</strong> fångar riktningen på sistone, inte bara totalresan — något som lutat
+på slutet får högre trend än något som dalat efter en bra start.</p>
+<p><strong>Hur den räknas:</strong> medel av de 20 sista stängningarna jämfört med medel av allt
+därför. Skillnaden i procent läggs på 0,5 och klips till 0–1. Finns färre än 20 observationsdagar,
+eller basalmedeln är 0, sätts trend till neutralt 0,5 (varken bonus eller straff).</p>
+<div class="formula">diff = (medel(20 sista stäng) − medel(övriga stäng)) / medel(övriga stäng)
+trend    = klipp( 0.5 + diff, 0, 1 )        # &lt;20 observationer → 0.5</div>
+
+<h2>3. Stabilitet — vikt 20</h2>
+<p><strong>Vad som mäts:</strong> dagliga procentförändringars standardavvikelse (daglig_std),
+åskildigansen mångdubbla √252 (annualisering, 252 handelsdagar per år). Formeln tar alltså
+daglig_std × √252, inte en färdig annualiserad volatitet.</p>
+<p><strong>Varför:</strong> en aktie som går upp lugnt poängbättre än en lika stark men hänsynslöst
+skakig — volatitet straffas direkt.</p>
+<p><strong>Hur den räknas:</strong> <code>1 − (daglig_std · √252)</code>, klips till 0–1. Noll
+volatitet ger del-poäng 1; daglig std ≥ ca 6,3 % (annualiserat ≥ 100 %) ger 0; daglig std ca 3,1 %
+motsvarar 0,5. Har vi ingen färdig std beräknas den från samma prisserie på samma sätt.</p>
+<div class="formula">daglig_std     = std(dagliga_procentförändringar)
+annualiserad   = daglig_std · √252
+stabilitet     = klipp( 1 − annualiserad, 0, 1 )   # daglig std ~0,0315 → 0,5</div>
+
+<h2>4. Likviditet — vikt 10 (minst)</h2>
+<p><strong>Vad som mäts:</strong> genomsnittlig daglig omsättning i antal aktor (volymkolumnen),
+nollvolymdagar räknas bort.</p>
+<p><strong>Varför:</strong> ju lättare handlad aktie, desto lättare att faktiskt köpa/sälja utan
+att påverka priset. Lågt viktad — den är ett villkor, inte en framgångssignal.</p>
+<p><strong>Hur den räknas:</strong> logaritmisk trappa: 100 aktor/dag ger 0, 1 000 000 aktor/dag
+ger 1, däremellan linjärt i log10. Ingen volym alls ger 0.</p>
+<div class="formula">likviditet = klipp( (log10(medel_volym) − 2) / 6, 0, 1 )   # 10²→0 … 10⁸→1</div>
+
+<h2>Från score till top-25-listan</h2>
+<ul>
+  <li>Varje ticker (ticker + region-par) scores ur sin dagliga OHLCV-serie i ett historiskt
+      parquet-register.</li>
+  <li><strong>Krav på tillräcklig data:</strong> en ticker med färre än 2 observationsdagar får
+      score 0,0 och flaggan <code>insufficient_data</code> — den kraschar inte och får inte ett
+      vilseledande värde. Den tekniska top-25-skärningen är i kod ett enkelt
+      <code>head(25)</code> efter fallande score-sortering.</li>
+  <li><strong>Sortering:</strong> alla scoreade tickers sorteras fallande på score, och rang 1, 2,
+      3 … tilldelas. De 25 översta exporteras som CSV + JSON.</li>
+  <li><strong>Datapipelinen:</strong> en hämtnings-manifest (DI1) på 13 766 tickers hämtas med
+      dagsdata för perioden <strong>1 år</strong> (period=1y, DI2). I den publicerade körningen
+      (2026-08-29) scoreades <strong>11 795 tickers</strong> över <strong>2 851 917
+      OHLCV-rader</strong>; 387 av tickers flaggades <code>insufficient_data</code> (främst med
+      bara 1 rad).</li>
+</ul>
+
+<div class="note">Obs: <em>sufficient_data</em>-flaggan påverkar alltså inte top-25-urvalet i den
+faktiska koden (skärningen är okonditionerad <code>head(25)</code>) — men en flaggad ticker har
+score 0,0 och hamnar i praktiken aldrig i toppen. Detta är scorern som den är, inte som man
+kunde gissa att den var.</div>
+
+<h2>Vikterna i koden</h2>
+<div class="table-wrap"><table class="board">
+<thead><tr><th>Komponent</th><th>Vikt (kod)</th><th>Rådata</th><th>Neutralpunkt</th></tr></thead>
+<tbody>
+<tr><td>Momentum</td><td>40</td><td>första/sista stängningskurs</td><td>oförändrad kurs → 0,5</td></tr>
+<tr><td>Trend</td><td>30</td><td>20 sista stäng vs resten</td><td>&lt;20 obs → 0,5</td></tr>
+<tr><td>Stabilitet</td><td>20</td><td>std av dagliga avkastningar · √252</td><td>daglig std ~3,1 % → 0,5</td></tr>
+<tr><td>Likviditet</td><td>10</td><td>medeldaglig volym (antal aktor)</td><td>~31 600/dag → 0,5</td></tr>
+</tbody></table></div>
+<p class="muted">Viktsummering i koden: <code>W_MOMENTUM=40, W_TREND=30, W_STABILITY=20,
+W_LIQUIDITY=10</code> — kommentaren i koden kräver att de summerar till 100, och det gör de.</p>
+
+<div class="provenance">
+  <span class="p-badge">sant mot kod · mirre 849.3</span>
+  <div class="p-meta">
+    <span class="p-item">källa: /srv/workspace/svarkor-rocket-25k-data-collect/teddy/685.3-score-top25-export-20260826.py</span>
+    <span class="p-item">antal: 766.1-evidence (11 795 tickers / 2 851 917 rows) + 685.1-manifest (13 766)</span>
+    <span class="p-item">theme: 766.3-top25-publish-index-20260829T1723.html</span>
+    <span class="p-item">verifierad: 2026-08-31 (mirre, MC 849.3)</span>
+  </div>
+</div>
+
+</div></body></html>
